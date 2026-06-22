@@ -23,6 +23,17 @@ android {
         }
     }
 
+    // 🌟 STEP A: DEFINE SIGNING CONFIGS FIRST
+    signingConfigs {
+        create("release") {
+            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "../btl-release.jks")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "BtlSecurePass2026"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "btl_alias"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "BtlSecurePass2026"
+        }
+    }
+
+    // 🌟 STEP B: REFERENCE IT IN BUILD TYPES LATER
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -32,15 +43,6 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
-        }
-    }
-
-    signingConfigs {
-        create("release") {
-            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "../btl-release.jks")
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "BtlSecurePass2026"
-            keyAlias = System.getenv("KEY_ALIAS") ?: "btl_alias"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: "BtlSecurePass2026"
         }
     }
 
@@ -77,7 +79,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
 
-    // 3. Aligned Navigation & Hilt Integration (Fixes the 2.5.1 Conflict)
+    // 3. Navigation & Hilt Integration
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
