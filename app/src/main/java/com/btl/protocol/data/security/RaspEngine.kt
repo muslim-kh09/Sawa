@@ -13,7 +13,7 @@ class RaspEngine(private val context: Context) {
 
     companion object {
         // Hardcoded expected SHA-256 signature of the app's signing certificate
-        private const val EXPECTED_SIGNATURE_HASH = "HARDCODED_PROD_SHA256_HEX_HERE"
+        private const val EXPECTED_SIGNATURE_HASH = "34:A6:77:2D:73:64:07:48:BA:80:82:CA:2D:4D:D2:F5:08:23:FA:38:15:78:BC:7C:88:0A:35:50:C9:EF:78:34"
         
         private val DANGEROUS_PACKAGES = listOf(
             "com.topjohnwu.magisk",
