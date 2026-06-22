@@ -55,7 +55,7 @@ class RaspEngine(private val context: Context) {
         }
         return try {
             val process = Runtime.getRuntime().exec(arrayOf("/system/xbin/which", "su"))
-            val reader = BufferedReader(FileReader(process.inputStream.fd))
+            val reader = java.io.BufferedReader(java.io.InputStreamReader(process.inputStream))
             val output = reader.readLine()
             reader.close()
             output != null
@@ -70,15 +70,11 @@ class RaspEngine(private val context: Context) {
 
     private fun isHookingFrameworkDetected(): Boolean {
         try {
-            val reader = BufferedReader(FileReader("/proc/self/maps"))
-            var line: String?
-            while (reader.readLine().also { line = it } != null) {
-                if (line?.contains("frida") == true || line?.contains("xposed") == true) {
-                    reader.close()
+            java.io.File("/proc/self/maps").forEachLine { line ->
+                if (line.contains("frida") || line.contains("xposed")) {
                     return true
                 }
             }
-            reader.close()
         } catch (e: Exception) {
             // Assume safe if we can't read maps due to permission drops
         }
