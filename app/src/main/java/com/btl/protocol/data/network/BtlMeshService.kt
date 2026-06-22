@@ -90,7 +90,11 @@ class BtlMeshService : Service() {
             .setServiceUuid(ParcelUuid(MESH_SERVICE_UUID))
             .build()
 
-        scanner?.startScan(listOf(filter), settings, bleScanCallback)
+        try {
+            scanner?.startScan(listOf(filter), settings, bleScanCallback)
+        } catch (e: SecurityException) {
+            Log.e("BtlMeshService", "SecurityException starting BLE scan", e)
+        }
 
         val advSettings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_POWER)
@@ -103,7 +107,11 @@ class BtlMeshService : Service() {
             .addServiceUuid(ParcelUuid(MESH_SERVICE_UUID))
             .build()
 
-        advertiser?.startAdvertising(advSettings, advData, advCallback)
+        try {
+            advertiser?.startAdvertising(advSettings, advData, advCallback)
+        } catch (e: SecurityException) {
+            Log.e("BtlMeshService", "SecurityException starting BLE advertising", e)
+        }
     }
 
     private val bleScanCallback = object : ScanCallback() {
@@ -147,7 +155,11 @@ class BtlMeshService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        bluetoothAdapter.bluetoothLeScanner?.stopScan(bleScanCallback)
-        bluetoothAdapter.bluetoothLeAdvertiser?.stopAdvertising(advCallback)
+        try {
+            bluetoothAdapter.bluetoothLeScanner?.stopScan(bleScanCallback)
+            bluetoothAdapter.bluetoothLeAdvertiser?.stopAdvertising(advCallback)
+        } catch (e: SecurityException) {
+            Log.e("BtlMeshService", "SecurityException stopping BLE", e)
+        }
     }
 }
