@@ -1,0 +1,79 @@
+name: Android Release Build & Sign
+
+on:
+  push:
+    branches:
+      - main
+      - release
+  pull_request:
+    branches:
+      - main
+      - release
+
+jobs:
+  build:
+    name: Build, Sign and Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Android NDK
+        uses: android-actions/setup-android@v3
+        with:
+          ndk-version: '26.1.10909125'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Decode Release Keystore
+        run: |
+          mkdir -p ~/.android/
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > ~/.android/release-keystore.jks
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Lint and Unit Tests
+        run: ./gradlew lintRelease testReleaseUnitTest --no-daemon
+
+      - name: Build Release APK
+        env:
+          KEYSTORE_PATH: ~/.android/release-keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BTL-Release-APK
+          path: app/build/outputs/apk/release/app-release.apk
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/app-release.apk
+          tag_name: "v1.0.${{ github.run_number }}"
+          name: "BTL Protocol Release 1.0.${{ github.run_number }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

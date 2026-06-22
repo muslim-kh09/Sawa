@@ -1,0 +1,153 @@
+package com.btl.protocol.data.network
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.bluetooth.le.AdvertiseCallback
+import android.bluetooth.le.AdvertiseData
+import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
+import android.content.Context
+import android.content.Intent
+import android.net.wifi.p2p.WifiP2pManager
+import android.os.IBinder
+import android.os.ParcelUuid
+import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
+
+class BtlMeshService : Service() {
+
+    companion object {
+        private const val NOTIFICATION_ID = 42
+        private const val CHANNEL_ID = "BTL_MESH_SERVICE_CHANNEL"
+        val MESH_SERVICE_UUID: UUID = UUID.fromString("0000B710-0000-1000-8000-00805F9B34FB")
+        
+        private val _connectedPeers = MutableStateFlow<List<String>>(emptyList())
+        val connectedPeers: StateFlow<List<String>> = _connectedPeers.asStateFlow()
+    }
+
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private lateinit var bluetoothAdapter: BluetoothAdapter
+    private lateinit var wifiP2pManager: WifiP2pManager
+    private lateinit var wifiP2pChannel: WifiP2pManager.Channel
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+        startForeground(NOTIFICATION_ID, buildNotification())
+
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        bluetoothAdapter = bluetoothManager.adapter
+        
+        wifiP2pManager = getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
+        wifiP2pChannel = wifiP2pManager.initialize(this, mainLooper, null)
+        
+        startBleMesh()
+        startWifiDirectDiscovery()
+    }
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "BTL Mesh Active",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Maintains offline mesh network connections"
+        }
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
+    }
+
+    private fun buildNotification(): Notification {
+        return Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle("BTL Mesh Network")
+            .setContentText("Actively routing offline packets...")
+            .setOngoing(true)
+            .build()
+    }
+
+    private fun startBleMesh() {
+        val scanner = bluetoothAdapter.bluetoothLeScanner
+        val advertiser = bluetoothAdapter.bluetoothLeAdvertiser
+
+        val settings = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+            .build()
+            
+        val filter = ScanFilter.Builder()
+            .setServiceUuid(ParcelUuid(MESH_SERVICE_UUID))
+            .build()
+
+        scanner?.startScan(listOf(filter), settings, bleScanCallback)
+
+        val advSettings = AdvertiseSettings.Builder()
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_POWER)
+            .setConnectable(true)
+            .setTimeout(0)
+            .build()
+
+        val advData = AdvertiseData.Builder()
+            .setIncludeDeviceName(false)
+            .addServiceUuid(ParcelUuid(MESH_SERVICE_UUID))
+            .build()
+
+        advertiser?.startAdvertising(advSettings, advData, advCallback)
+    }
+
+    private val bleScanCallback = object : ScanCallback() {
+        override fun onScanResult(callbackType: Int, result: ScanResult?) {
+            result?.device?.let { device ->
+                val current = _connectedPeers.value.toMutableList()
+                if (!current.contains(device.address)) {
+                    current.add(device.address)
+                    _connectedPeers.value = current
+                }
+            }
+        }
+    }
+
+    private val advCallback = object : AdvertiseCallback() {
+        override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+            Log.d("BtlMeshService", "BLE Advertising started successfully.")
+        }
+
+        override fun onStartFailure(errorCode: Int) {
+            Log.e("BtlMeshService", "BLE Advertising failed: $errorCode")
+        }
+    }
+
+    private fun startWifiDirectDiscovery() {
+        try {
+            wifiP2pManager.discoverPeers(wifiP2pChannel, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    Log.d("BtlMeshService", "Wi-Fi Direct discovery started.")
+                }
+                override fun onFailure(reasonCode: Int) {
+                    Log.e("BtlMeshService", "Wi-Fi Direct discovery failed: $reasonCode")
+                }
+            })
+        } catch (e: SecurityException) {
+            Log.e("BtlMeshService", "Missing permissions for Wi-Fi Direct", e)
+        }
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        super.onDestroy()
+        bluetoothAdapter.bluetoothLeScanner?.stopScan(bleScanCallback)
+        bluetoothAdapter.bluetoothLeAdvertiser?.stopAdvertising(advCallback)
+    }
+}
