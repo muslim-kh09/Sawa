@@ -69,12 +69,18 @@ class RaspEngine(private val context: Context) {
     }
 
     private fun isHookingFrameworkDetected(): Boolean {
+        val file = java.io.File("/proc/self/maps")
+        if (!file.exists()) return false
         try {
-            java.io.File("/proc/self/maps").forEachLine { line ->
+            val scanner = java.util.Scanner(file)
+            while (scanner.hasNextLine()) {
+                val line = scanner.nextLine()
                 if (line.contains("frida") || line.contains("xposed")) {
+                    scanner.close()
                     return true
                 }
             }
+            scanner.close()
         } catch (e: Exception) {
             // Assume safe if we can't read maps due to permission drops
         }
