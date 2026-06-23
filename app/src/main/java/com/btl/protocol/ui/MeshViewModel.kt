@@ -100,15 +100,21 @@ class MeshViewModel @Inject constructor(
      */
     @SuppressLint("MissingPermission")
     fun sendSos(context: Context) {
-        val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (!hasPermission) {
+        val hasFine = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val hasCoarse = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        
+        if (!hasFine && !hasCoarse) {
             sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
             return
         }
 
         try {
             val client = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-            val priority = com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
+            val priority = if (hasFine) {
+                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
+            } else {
+                com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY
+            }
             val cancellationTokenSource = com.google.android.gms.tasks.CancellationTokenSource()
 
             client.getCurrentLocation(priority, cancellationTokenSource.token).addOnSuccessListener { location ->
