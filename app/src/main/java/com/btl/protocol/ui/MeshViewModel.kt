@@ -108,7 +108,66 @@ class MeshViewModel @Inject constructor(
             return
         }
 
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+        val isGpsEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)
+        val isNetworkEnabled = locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+
+        if (!isGpsEnabled && !isNetworkEnabled) {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(context, "Please enable system GPS/Location services!", android.widget.Toast.LENGTH_LONG).show()
+            }
+            sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+            return
+        }
+
+        fun fallbackToNativeLocation() {
+            try {
+                val provider = if (isGpsEnabled && hasFine) android.location.LocationManager.GPS_PROVIDER else android.location.LocationManager.NETWORK_PROVIDER
+                
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    locationManager.getCurrentLocation(
+                        provider,
+                        null,
+                        androidx.core.content.ContextCompat.getMainExecutor(context)
+                    ) { location ->
+                        if (location != null) {
+                            val lat = String.format(java.util.Locale.US, "%.4f", location.latitude)
+                            val lon = String.format(java.util.Locale.US, "%.4f", location.longitude)
+                            sendMessage("[🆘 SOS] I need immediate help! Location: $lat, $lon. Please relay.")
+                        } else {
+                            sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+                        }
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    locationManager.requestSingleUpdate(
+                        provider,
+                        object : android.location.LocationListener {
+                            override fun onLocationChanged(location: android.location.Location) {
+                                val lat = String.format(java.util.Locale.US, "%.4f", location.latitude)
+                                val lon = String.format(java.util.Locale.US, "%.4f", location.longitude)
+                                sendMessage("[🆘 SOS] I need immediate help! Location: $lat, $lon. Please relay.")
+                            }
+                            override fun onStatusChanged(p: String?, s: Int, e: android.os.Bundle?) {}
+                            override fun onProviderEnabled(p: String) {}
+                            override fun onProviderDisabled(p: String) {}
+                        },
+                        android.os.Looper.getMainLooper()
+                    )
+                }
+            } catch (e: Exception) {
+                sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+            }
+        }
+
         try {
+            // Fast check for Play Services
+            val apiAvailability = com.google.android.gms.common.GoogleApiAvailability.getInstance()
+            if (apiAvailability.isGooglePlayServicesAvailable(context) != com.google.android.gms.common.ConnectionResult.SUCCESS) {
+                fallbackToNativeLocation()
+                return
+            }
+
             val client = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
             val priority = if (hasFine) {
                 com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
@@ -123,13 +182,13 @@ class MeshViewModel @Inject constructor(
                     val lon = String.format(java.util.Locale.US, "%.4f", location.longitude)
                     sendMessage("[🆘 SOS] I need immediate help! Location: $lat, $lon. Please relay.")
                 } else {
-                    sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+                    fallbackToNativeLocation()
                 }
             }.addOnFailureListener {
-                sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+                fallbackToNativeLocation()
             }
         } catch (t: Throwable) {
-            sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+            fallbackToNativeLocation()
         }
     }
 
