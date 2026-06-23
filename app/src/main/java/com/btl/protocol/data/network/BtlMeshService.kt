@@ -21,9 +21,11 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -36,8 +38,8 @@ class BtlMeshService : Service() {
         val CHAR_UUID: UUID = UUID.fromString("0000B71D-0000-1000-8000-00805f9b34fb")
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         
-        private val _connectedPeers = MutableStateFlow<Set<String>>(emptySet())
-        val connectedPeers: StateFlow<Set<String>> = _connectedPeers.asStateFlow()
+        private val _connectedPeers = MutableStateFlow<Map<String, BluetoothDevice>>(emptyMap())
+        val connectedPeers: StateFlow<Map<String, BluetoothDevice>> = _connectedPeers.asStateFlow()
         
         var instance: BtlMeshService? = null
 
@@ -60,6 +62,13 @@ class BtlMeshService : Service() {
     private val connectedServerClients = ConcurrentHashMap<String, BluetoothDevice>()
     private val deviceMtuMap = ConcurrentHashMap<String, Int>()
 
+    // Transmission Queues
+    private val clientWriteQueue = ConcurrentHashMap<String, java.util.concurrent.ConcurrentLinkedQueue<ByteArray>>()
+    private val isClientWriting = ConcurrentHashMap<String, Boolean>()
+    
+    private val serverNotifyQueue = ConcurrentHashMap<String, java.util.concurrent.ConcurrentLinkedQueue<ByteArray>>()
+    private val isServerNotifying = ConcurrentHashMap<String, Boolean>()
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -80,10 +89,14 @@ class BtlMeshService : Service() {
     }
 
     private fun updateConnectedPeers() {
-        val peers = mutableSetOf<String>()
-        peers.addAll(connectedClientGatts.keys)
-        peers.addAll(connectedServerClients.keys)
-        _connectedPeers.value = peers
+        val newMap = mutableMapOf<String, BluetoothDevice>()
+        for ((address, gatt) in connectedClientGatts) {
+            newMap[address] = gatt.device
+        }
+        for ((address, device) in connectedServerClients) {
+            newMap[address] = device
+        }
+        _connectedPeers.value = newMap
     }
 
     private fun createNotificationChannel() {
@@ -193,6 +206,12 @@ class BtlMeshService : Service() {
     private val bleScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             result?.device?.let { device ->
+                // HARD ENFORCE FILTER: ensure UUID is strictly present in scan record
+                val uuids = result.scanRecord?.serviceUuids
+                if (uuids?.contains(ParcelUuid(MESH_SERVICE_UUID)) != true) {
+                    return
+                }
+
                 if (!connectedClientGatts.containsKey(device.address)) {
                     try {
                         Log.d("BtlMeshService", "Found device, connecting GATT: ${device.address}")
@@ -217,7 +236,6 @@ class BtlMeshService : Service() {
                 connectedClientGatts[address] = gatt
                 updateConnectedPeers()
                 try {
-                    // MTU Negotiation
                     val requested = gatt.requestMtu(512)
                     Log.d("BtlMeshService", "Requested MTU 512: $requested")
                 } catch (e: SecurityException) {}
@@ -225,6 +243,8 @@ class BtlMeshService : Service() {
                 Log.d("BtlMeshService", "GATT Client disconnected from: $address")
                 connectedClientGatts.remove(address)
                 deviceMtuMap.remove(address)
+                isClientWriting.remove(address)
+                clientWriteQueue.remove(address)
                 updateConnectedPeers()
                 try {
                     gatt.close()
@@ -236,16 +256,13 @@ class BtlMeshService : Service() {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.d("BtlMeshService", "MTU changed to $mtu for ${gatt.device.address}")
                 deviceMtuMap[gatt.device.address] = mtu
-                try {
-                    gatt.discoverServices()
-                } catch (e: SecurityException) {}
             } else {
                 Log.e("BtlMeshService", "MTU request failed, falling back to 20")
                 deviceMtuMap[gatt.device.address] = 23 // Default MTU
-                try {
-                    gatt.discoverServices()
-                } catch (e: SecurityException) {}
             }
+            try {
+                gatt.discoverServices()
+            } catch (e: SecurityException) {}
         }
         
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
@@ -255,7 +272,6 @@ class BtlMeshService : Service() {
                 if (char != null) {
                     try {
                         gatt.setCharacteristicNotification(char, true)
-                        // CCCD descriptor (Critical)
                         val descriptor = char.getDescriptor(CCCD_UUID)
                         if (descriptor != null) {
                             descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
@@ -270,8 +286,13 @@ class BtlMeshService : Service() {
         }
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            val address = gatt.device.address
+            isClientWriting[address] = false
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 Log.d("BtlMeshService", "Message chunk written successfully to GATT")
+                processNextClientChunk(address)
+            } else {
+                Log.e("BtlMeshService", "Failed to write chunk to $address, status: $status")
             }
         }
 
@@ -279,7 +300,7 @@ class BtlMeshService : Service() {
             val data = characteristic.value
             if (data != null) {
                 Log.d("BtlMeshService", "Received data via Client notification: ${data.size} bytes")
-                // In a real app we'd pass this up to the app logic
+                // Pass to repository...
             }
         }
     }
@@ -295,6 +316,8 @@ class BtlMeshService : Service() {
                 Log.d("BtlMeshService", "GATT Server client disconnected: $address")
                 connectedServerClients.remove(address)
                 deviceMtuMap.remove(address)
+                isServerNotifying.remove(address)
+                serverNotifyQueue.remove(address)
                 updateConnectedPeers()
             }
         }
@@ -320,7 +343,7 @@ class BtlMeshService : Service() {
                     }
                     if (value != null) {
                         Log.d("BtlMeshService", "Received data via Server write: ${value.size} bytes")
-                        // In a real app we'd pass this up to the app logic
+                        // Pass to repository...
                     }
                 } catch (e: SecurityException) {
                     Log.e("BtlMeshService", "Failed to send write response", e)
@@ -372,47 +395,78 @@ class BtlMeshService : Service() {
     }
 
     private fun transmit(payload: ByteArray) {
-        // Payload Chunking (Fallback)
-        // If MTU fails, fallback to 20 bytes payload (MTU 23 - 3 bytes overhead)
-        
         // Send via Server to connected Clients (Notify)
-        for ((address, device) in connectedServerClients) {
+        for ((address, _) in connectedServerClients) {
             val mtu = deviceMtuMap[address] ?: 23
             val chunkSize = (mtu - 3).coerceAtLeast(20)
             val chunks = payload.toList().chunked(chunkSize)
             
-            val char = gattServer?.getService(MESH_SERVICE_UUID)?.getCharacteristic(CHAR_UUID)
-            if (char != null) {
-                for (chunk in chunks) {
-                    char.value = chunk.toByteArray()
+            val queue = serverNotifyQueue.getOrPut(address) { java.util.concurrent.ConcurrentLinkedQueue() }
+            for (chunk in chunks) {
+                queue.add(chunk.toByteArray())
+            }
+            processNextServerChunk(address)
+        }
+
+        // Send via Client to connected Servers (Write)
+        for ((address, _) in connectedClientGatts) {
+            val mtu = deviceMtuMap[address] ?: 23
+            val chunkSize = (mtu - 3).coerceAtLeast(20)
+            val chunks = payload.toList().chunked(chunkSize)
+            
+            val queue = clientWriteQueue.getOrPut(address) { java.util.concurrent.ConcurrentLinkedQueue() }
+            for (chunk in chunks) {
+                queue.add(chunk.toByteArray())
+            }
+            processNextClientChunk(address)
+        }
+    }
+
+    private fun processNextClientChunk(address: String) {
+        if (isClientWriting[address] == true) return
+        val gatt = connectedClientGatts[address] ?: return
+        val queue = clientWriteQueue[address] ?: return
+        val chunk = queue.poll() ?: return
+        
+        isClientWriting[address] = true
+        val char = gatt.getService(MESH_SERVICE_UUID)?.getCharacteristic(CHAR_UUID)
+        if (char != null) {
+            char.value = chunk
+            try {
+                if (!gatt.writeCharacteristic(char)) {
+                    isClientWriting[address] = false
+                    Log.e("BtlMeshService", "writeCharacteristic returned false for $address")
+                }
+            } catch (e: SecurityException) {
+                isClientWriting[address] = false
+                Log.e("BtlMeshService", "SecurityException on writeCharacteristic", e)
+            }
+        } else {
+            isClientWriting[address] = false
+        }
+    }
+
+    private fun processNextServerChunk(address: String) {
+        if (isServerNotifying[address] == true) return
+        val device = connectedServerClients[address] ?: return
+        val queue = serverNotifyQueue[address] ?: return
+        
+        isServerNotifying[address] = true
+        serviceScope.launch {
+            while (queue.isNotEmpty()) {
+                val chunk = queue.poll() ?: break
+                val char = gattServer?.getService(MESH_SERVICE_UUID)?.getCharacteristic(CHAR_UUID)
+                if (char != null) {
+                    char.value = chunk
                     try {
                         gattServer?.notifyCharacteristicChanged(device, char, false)
-                        Log.d("BtlMeshService", "Sent chunk of ${chunk.size} via Server Notify to $address")
                     } catch (e: SecurityException) {
                         Log.e("BtlMeshService", "Failed to notify characteristic", e)
                     }
                 }
+                delay(50) // Allow BT stack to process notification
             }
-        }
-
-        // Send via Client to connected Servers (Write)
-        for ((address, gatt) in connectedClientGatts) {
-            val mtu = deviceMtuMap[address] ?: 23
-            val chunkSize = (mtu - 3).coerceAtLeast(20)
-            val chunks = payload.toList().chunked(chunkSize)
-            
-            val char = gatt.getService(MESH_SERVICE_UUID)?.getCharacteristic(CHAR_UUID)
-            if (char != null) {
-                for (chunk in chunks) {
-                    char.value = chunk.toByteArray()
-                    try {
-                        gatt.writeCharacteristic(char)
-                        Log.d("BtlMeshService", "Sent chunk of ${chunk.size} via Client Write to $address")
-                    } catch (e: SecurityException) {
-                        Log.e("BtlMeshService", "Failed to write characteristic", e)
-                    }
-                }
-            }
+            isServerNotifying[address] = false
         }
     }
 
