@@ -34,8 +34,8 @@ class BtlMeshService : Service() {
         private const val CHANNEL_ID = "BTL_MESH_SERVICE_CHANNEL"
         val MESH_SERVICE_UUID: UUID = UUID.fromString("0000B71C-0000-1000-8000-00805f9b34fb")
         
-        private val _connectedPeers = MutableStateFlow<List<String>>(emptyList())
-        val connectedPeers: StateFlow<List<String>> = _connectedPeers.asStateFlow()
+        private val _connectedPeers = MutableStateFlow<Set<String>>(emptySet())
+        val connectedPeers: StateFlow<Set<String>> = _connectedPeers.asStateFlow()
         
         fun transmitGatt(text: String) {
             Log.d("BtlMeshService", "Transmitting encrypted byte array via GATT to nodes: $text")
@@ -139,11 +139,49 @@ class BtlMeshService : Service() {
     private val bleScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             result?.device?.let { device ->
-                val current = _connectedPeers.value.toMutableList()
-                if (!current.contains(device.address)) {
-                    current.add(device.address)
+                val current = _connectedPeers.value.toMutableSet()
+                if (current.add(device.address)) {
                     _connectedPeers.value = current
+                    try {
+                        device.connectGatt(this@BtlMeshService, false, gattCallback)
+                    } catch (e: SecurityException) {
+                        Log.e("BtlMeshService", "SecurityException connecting GATT", e)
+                    }
                 }
+            }
+        }
+    }
+
+    private val gattCallback = object : android.bluetooth.BluetoothGattCallback() {
+        override fun onConnectionStateChange(gatt: android.bluetooth.BluetoothGatt, status: Int, newState: Int) {
+            if (newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED) {
+                try {
+                    gatt.requestMtu(512)
+                    gatt.discoverServices()
+                } catch (e: SecurityException) {}
+            }
+        }
+        
+        override fun onServicesDiscovered(gatt: android.bluetooth.BluetoothGatt, status: Int) {
+            if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
+                val service = gatt.getService(MESH_SERVICE_UUID)
+                val char = service?.getCharacteristic(UUID.fromString("0000B71D-0000-1000-8000-00805f9b34fb"))
+                if (char != null) {
+                    try {
+                        gatt.setCharacteristicNotification(char, true)
+                        val descriptor = char.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+                        if (descriptor != null) {
+                            descriptor.value = android.bluetooth.BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                            gatt.writeDescriptor(descriptor)
+                        }
+                    } catch (e: SecurityException) {}
+                }
+            }
+        }
+
+        override fun onCharacteristicWrite(gatt: android.bluetooth.BluetoothGatt, characteristic: android.bluetooth.BluetoothGattCharacteristic, status: Int) {
+            if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
+                Log.d("BtlMeshService", "Message written successfully to GATT")
             }
         }
     }

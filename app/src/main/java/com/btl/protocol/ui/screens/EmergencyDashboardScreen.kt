@@ -27,7 +27,8 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmergencyDashboardScreen(messageDao: MessageDao) {
-    val connectedPeers by BtlMeshService.connectedPeers.collectAsState()
+    val connectedPeersSet by BtlMeshService.connectedPeers.collectAsState()
+    val connectedPeers = connectedPeersSet.toList()
     var messageText by remember { mutableStateOf("") }
     val messages by messageDao.getMessages().collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
@@ -83,7 +84,19 @@ fun EmergencyDashboardScreen(messageDao: MessageDao) {
                                 .padding(12.dp)
                                 .widthIn(max = 280.dp)
                         ) {
-                            Text(text = msg.text, color = Color.Black, fontSize = 14.sp)
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(text = msg.text, color = Color.Black, fontSize = 14.sp, modifier = Modifier.weight(1f, fill = false))
+                                if (msg.isMe) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    val checkmark = when (msg.status) {
+                                        2 -> "✓✓"
+                                        1 -> "✓"
+                                        else -> "🕐"
+                                    }
+                                    val checkColor = if (msg.status == 2) Color(0xFF34B7F1) else Color.Gray
+                                    Text(text = checkmark, color = checkColor, fontSize = 10.sp)
+                                }
+                            }
                         }
                     }
                 }

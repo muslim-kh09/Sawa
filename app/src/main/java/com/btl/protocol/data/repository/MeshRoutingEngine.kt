@@ -42,7 +42,8 @@ data class Message(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val isMe: Boolean,
     val text: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val status: Int = 0
 )
 
 @Dao
@@ -52,9 +53,12 @@ interface MessageDao {
 
     @Query("SELECT * FROM messages ORDER BY timestamp ASC")
     fun getMessages(): Flow<List<Message>>
+
+    @Query("UPDATE messages SET status = :status WHERE id = :id")
+    suspend fun updateStatus(id: Int, status: Int)
 }
 
-@Database(entities = [PacketLedgerEntity::class, Message::class], version = 2, exportSchema = false)
+@Database(entities = [PacketLedgerEntity::class, Message::class], version = 3, exportSchema = false)
 abstract class MeshDatabase : RoomDatabase() {
     abstract fun packetLedgerDao(): PacketLedgerDao
     abstract fun messageDao(): MessageDao
