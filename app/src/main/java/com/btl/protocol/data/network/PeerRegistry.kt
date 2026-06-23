@@ -27,8 +27,9 @@ private const val EVICTION_PERIOD_MS = 15_000L
  * @param rssi      Signal strength in dBm from the last scan result.
  */
 data class SawaPeer(
+    val nodeId: String,
     val address: String,
-    val device: BluetoothDevice,
+    @Volatile var device: BluetoothDevice,
     @Volatile var lastSeen: Long = System.currentTimeMillis(),
     @Volatile var rssi: Int = 0
 )
@@ -64,15 +65,17 @@ class PeerRegistry(scope: CoroutineScope) {
      * Updates [SawaPeer.lastSeen] and [SawaPeer.rssi] for existing peers;
      * adds a new entry and emits on [stateFlow] for new peers.
      */
-    fun seen(device: BluetoothDevice, rssi: Int = 0) {
-        val existing = _peers[device.address]
+    fun seen(nodeId: String, device: BluetoothDevice, rssi: Int = 0) {
+        val existing = _peers[nodeId]
         if (existing != null) {
             // Refresh timestamp & RSSI without emitting a new flow event
             existing.lastSeen = System.currentTimeMillis()
             existing.rssi = rssi
+            existing.device = device // Update device in case MAC rotated
         } else {
-            Log.i(TAG, "✚ New Sawa peer: ${device.address} (RSSI: $rssi dBm)")
-            _peers[device.address] = SawaPeer(
+            Log.i(TAG, "✚ New Sawa peer: $nodeId (RSSI: $rssi dBm)")
+            _peers[nodeId] = SawaPeer(
+                nodeId = nodeId,
                 address = device.address,
                 device = device,
                 rssi = rssi

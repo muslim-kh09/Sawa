@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
     // ──────────────────────────────────────────────────────────────────────────
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        androidx.activity.enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 

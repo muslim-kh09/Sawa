@@ -76,6 +76,8 @@ class BtlMeshService : Service() {
 
         /** Unique identifier for this device instance to prevent self-echoes. */
         val LOCAL_DEVICE_ID = java.util.UUID.randomUUID().toString()
+        val NODE_ID_BYTES = LOCAL_DEVICE_ID.toByteArray(Charsets.UTF_8).take(8).toByteArray()
+        val NODE_ID_STRING = String(NODE_ID_BYTES, Charsets.UTF_8)
 
         /** Tracks seen message UUIDs to deduplicate echoes from the broadcast mesh. */
         val processedMessageIds = mutableSetOf<String>()
@@ -405,9 +407,16 @@ class BtlMeshService : Service() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             result?.device?.let { device ->
                 // Secondary software UUID check (belt-and-suspenders)
-                val uuids = result.scanRecord?.serviceUuids
-                if (uuids?.contains(ParcelUuid(MESH_SERVICE_UUID)) != true) return
-                peerRegistry.seen(device, result.rssi)
+                val scanRecord = result.scanRecord ?: return
+                if (!scanRecord.serviceUuids.orEmpty().contains(ParcelUuid(MESH_SERVICE_UUID))) return
+                
+                // Extract Node ID
+                val serviceData = scanRecord.serviceData[ParcelUuid(MESH_SERVICE_UUID)] ?: return
+                val nodeId = String(serviceData, Charsets.UTF_8)
+                
+                if (nodeId == NODE_ID_STRING) return // Ignore self
+                
+                peerRegistry.seen(nodeId, device, result.rssi)
             }
         }
 
@@ -434,6 +443,7 @@ class BtlMeshService : Service() {
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .addServiceUuid(ParcelUuid(MESH_SERVICE_UUID))
+            .addServiceData(ParcelUuid(MESH_SERVICE_UUID), NODE_ID_BYTES)
             .build()
         try {
             advertiser.startAdvertising(settings, data, advertiseCallback)

@@ -108,17 +108,21 @@ class GattOperationQueue(
                 }
                 val data = fragments[fragIndex]
                 try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    val initiated = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         gatt.writeCharacteristic(
                             char,
                             data,
                             BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                        )
+                        ) == android.bluetooth.BluetoothStatusCodes.SUCCESS
                     } else {
                         @Suppress("DEPRECATION")
                         char.value = data
                         @Suppress("DEPRECATION")
                         gatt.writeCharacteristic(char)
+                    }
+                    if (!initiated) {
+                        Log.e(TAG, "writeCharacteristic rejected synchronously")
+                        settle(false)
                     }
                 } catch (e: SecurityException) {
                     Log.e(TAG, "SecurityException during writeCharacteristic", e)
@@ -132,7 +136,13 @@ class GattOperationQueue(
                         BluetoothProfile.STATE_CONNECTED -> {
                             Log.d(TAG, "[${op.device.address}] Connected — requesting MTU $TARGET_MTU")
                             try {
-                                gatt.requestMtu(TARGET_MTU)
+                                if (!gatt.requestMtu(TARGET_MTU)) {
+                                    Log.w(TAG, "requestMtu failed, falling back to MTU 23")
+                                    negotiatedMtu = 23
+                                    fragments = PacketFragmenter.fragment(op.payload, 20)
+                                    fragIndex = 0
+                                    if (!gatt.discoverServices()) settle(false)
+                                }
                             } catch (e: SecurityException) {
                                 Log.e(TAG, "SecurityException requestMtu", e)
                                 settle(false)
@@ -156,7 +166,10 @@ class GattOperationQueue(
                     fragments = PacketFragmenter.fragment(op.payload, maxPayload)
                     fragIndex = 0
                     try {
-                        gatt.discoverServices()
+                        if (!gatt.discoverServices()) {
+                            Log.e(TAG, "discoverServices rejected synchronously")
+                            settle(false)
+                        }
                     } catch (e: SecurityException) {
                         Log.e(TAG, "SecurityException discoverServices", e)
                         settle(false)
