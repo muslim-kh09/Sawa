@@ -21,8 +21,8 @@ import com.btl.protocol.ui.screens.ChatScreen
 import com.btl.protocol.ui.screens.OnboardingScreen
 import com.btl.protocol.ui.theme.SawaTheme
 import com.btl.protocol.data.ota.OtaUpdateManager
-import com.btl.protocol.BuildConfig
 import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -94,8 +94,13 @@ class MainActivity : ComponentActivity() {
         refreshState()
 
         // Check for OTA updates in the background
-        androidx.lifecycle.lifecycleScope.launch {
-            val update = OtaUpdateManager.checkForUpdates(BuildConfig.VERSION_NAME)
+        lifecycleScope.launch {
+            val versionName = try {
+                packageManager.getPackageInfo(packageName, 0).versionName
+            } catch (e: Exception) {
+                "1.0.0"
+            }
+            val update = OtaUpdateManager.checkForUpdates(versionName ?: "1.0.0")
             if (update != null) {
                 availableUpdate = update
             }
