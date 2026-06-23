@@ -157,6 +157,13 @@ class BtlMeshService : Service() {
             if (newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED) {
                 try {
                     gatt.requestMtu(512)
+                } catch (e: SecurityException) {}
+            }
+        }
+
+        override fun onMtuChanged(gatt: android.bluetooth.BluetoothGatt, mtu: Int, status: Int) {
+            if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
+                try {
                     gatt.discoverServices()
                 } catch (e: SecurityException) {}
             }
