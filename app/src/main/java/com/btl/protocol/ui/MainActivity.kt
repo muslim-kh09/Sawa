@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.lifecycle.Lifecycle
@@ -75,7 +76,7 @@ class MainActivity : ComponentActivity() {
     // ──────────────────────────────────────────────────────────────────────────
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        androidx.activity.enableEdgeToEdge()
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 
