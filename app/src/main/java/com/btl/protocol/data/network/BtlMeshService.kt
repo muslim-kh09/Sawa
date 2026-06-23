@@ -118,6 +118,18 @@ class BtlMeshService : Service() {
         private val _meshActive = MutableStateFlow(false)
         val meshActive: StateFlow<Boolean> = _meshActive.asStateFlow()
 
+        data class PeerIdentity(val fullId: String, val displayName: String)
+        private val _knownIdentities = MutableStateFlow<Map<String, PeerIdentity>>(emptyMap())
+        val knownIdentities: StateFlow<Map<String, PeerIdentity>> = _knownIdentities.asStateFlow()
+
+        fun updateIdentity(sId: String, dName: String) {
+            val nodeId = sId.take(8)
+            val current = _knownIdentities.value
+            if (current[nodeId]?.displayName != dName) {
+                _knownIdentities.value = current + (nodeId to PeerIdentity(sId, dName))
+            }
+        }
+
         // References to live service components — null when the service is not running
         @Volatile private var liveQueue: GattOperationQueue? = null
         @Volatile private var livePeers: PeerRegistry? = null
@@ -252,7 +264,7 @@ class BtlMeshService : Service() {
                     val allIds = meshRepository.getAllMessageIds()
                     if (allIds.isNotEmpty()) {
                         val recentIds = allIds.takeLast(20)
-                        val syncPayload = "SYNC|${recentIds.joinToString(",")}"
+                        val syncPayload = "SYNC|${recentIds.joinToString(",")}|$LOCAL_DEVICE_ID|$DISPLAY_NAME"
                         val payload = buildOutgoingPayload(syncPayload)
                         
                         // Enqueue to all peers safely
@@ -411,7 +423,11 @@ class BtlMeshService : Service() {
 
         // --- Vector Sync Anti-Entropy Logic ---
         if (text.startsWith("SYNC|")) {
-            val remoteIds = text.removePrefix("SYNC|").split(",")
+            val parts = text.split("|")
+            if (parts.size >= 4) {
+                updateIdentity(parts[2], parts[3])
+            }
+            val remoteIds = parts[1].split(",")
             val localIds = meshRepository.getAllMessageIds()
             // Sync up to 20 missing messages to avoid flooding
             val missingInRemote = localIds.filter { it !in remoteIds }.takeLast(20)
@@ -420,7 +436,7 @@ class BtlMeshService : Service() {
             missingInRemote.forEach { missingId ->
                 val msg = meshRepository.getMessageById(missingId)
                 if (msg != null) {
-                    val relayText = "${msg.messageId}|$LOCAL_DEVICE_ID|${msg.senderName ?: "Unknown"}|${msg.text}"
+                    val relayText = "${msg.messageId}|$LOCAL_DEVICE_ID|${msg.senderName ?: "Unknown"}|${msg.conversationId}|${msg.text}"
                     val relayPayload = buildOutgoingPayload(relayText)
                     gattQueue.enqueue(GattWriteOp(device = peerDevice, payload = relayPayload))
                 }
@@ -438,6 +454,7 @@ class BtlMeshService : Service() {
             val actualText = parts[4]
             
             if (sId == LOCAL_DEVICE_ID) return // drop self-echo
+            updateIdentity(sId, dName)
             if (processedMessageIds.contains(msgId)) return
             processedMessageIds.add(msgId)
 
@@ -455,6 +472,7 @@ class BtlMeshService : Service() {
             val actualText = parts[3]
             
             if (sId == LOCAL_DEVICE_ID) return // drop self-echo
+            updateIdentity(sId, dName)
             if (processedMessageIds.contains(msgId)) return
             processedMessageIds.add(msgId)
 

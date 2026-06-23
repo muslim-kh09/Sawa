@@ -52,12 +52,17 @@ private val ColorTextSecondary = Color(0xFF8696A0)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(conversationId: String = "PUBLIC", viewModel: MeshViewModel = hiltViewModel()) {
+fun ChatScreen(
+    conversationId: String = "PUBLIC", 
+    onNavigateToDm: (String) -> Unit = {},
+    viewModel: MeshViewModel = hiltViewModel()
+) {
     val allMessages by viewModel.messages.collectAsState()
     val messages = remember(allMessages, conversationId) {
         allMessages.filter { it.conversationId == conversationId }
     }
     val peers      by viewModel.peers.collectAsState()
+    val knownIdentities by viewModel.knownIdentities.collectAsState()
     val meshActive by viewModel.meshActive.collectAsState()
     val peerCount = peers.size
 
@@ -65,6 +70,7 @@ fun ChatScreen(conversationId: String = "PUBLIC", viewModel: MeshViewModel = hil
     val listState = rememberLazyListState()
     val context = LocalContext.current
     var showEditNameDialog by remember { mutableStateOf(false) }
+    var showPeersDialog by remember { mutableStateOf(false) }
 
     // Auto-scroll to the latest message
     LaunchedEffect(messages.size) {
@@ -81,6 +87,8 @@ fun ChatScreen(conversationId: String = "PUBLIC", viewModel: MeshViewModel = hil
             ChatTopBar(
                 peerCount = peerCount, 
                 meshActive = meshActive, 
+                conversationId = conversationId,
+                knownIdentities = knownIdentities,
                 onSosClick = { viewModel.sendSos(context) },
                 onPanicClick = { viewModel.panicWipe() },
                 onEditNameClick = { showEditNameDialog = true }
@@ -94,7 +102,9 @@ fun ChatScreen(conversationId: String = "PUBLIC", viewModel: MeshViewModel = hil
                 .background(ColorBackground)
         ) {
             // ── Network status banner
-            NetworkBanner(peerCount = peerCount, meshActive = meshActive)
+            Box(modifier = Modifier.clickable { if (peerCount > 0) showPeersDialog = true }) {
+                NetworkBanner(peerCount = peerCount, meshActive = meshActive)
+            }
 
             // ── Message list
             LazyColumn(
@@ -173,6 +183,51 @@ fun ChatScreen(conversationId: String = "PUBLIC", viewModel: MeshViewModel = hil
             }
         )
     }
+
+    if (showPeersDialog) {
+        AlertDialog(
+            onDismissRequest = { showPeersDialog = false },
+            title = { Text("Active Mesh Peers", color = ColorTextPrimary) },
+            text = {
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
+                    items(peers.values.toList(), key = { it.nodeId }) { peer ->
+                        val identity = knownIdentities[peer.nodeId]
+                        val displayName = identity?.displayName ?: "Unknown Peer (${peer.nodeId})"
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showPeersDialog = false
+                                    if (identity != null) {
+                                        onNavigateToDm(identity.fullId)
+                                    } else {
+                                        // Fallback if we don't have full ID yet
+                                        android.widget.Toast.makeText(context, "Waiting for peer identity sync...", android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Canvas(modifier = Modifier.size(10.dp)) {
+                                drawCircle(color = ColorPeerOnline)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(displayName, color = ColorTextPrimary, fontWeight = FontWeight.Bold)
+                                Text("RSSI: ${peer.rssi} dBm", color = ColorTextSecondary, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            },
+            containerColor = ColorBackground,
+            confirmButton = {
+                TextButton(onClick = { showPeersDialog = false }) {
+                    Text("Close", color = ColorSendBtn)
+                }
+            }
+        )
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -181,8 +236,33 @@ fun ChatScreen(conversationId: String = "PUBLIC", viewModel: MeshViewModel = hil
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChatTopBar(peerCount: Int, meshActive: Boolean, onSosClick: () -> Unit, onPanicClick: () -> Unit, onEditNameClick: () -> Unit) {
+private fun ChatTopBar(
+    peerCount: Int, 
+    meshActive: Boolean, 
+    conversationId: String,
+    knownIdentities: Map<String, com.btl.protocol.data.network.BtlMeshService.Companion.PeerIdentity>,
+    onSosClick: () -> Unit, 
+    onPanicClick: () -> Unit, 
+    onEditNameClick: () -> Unit
+) {
     var tapTimes by remember { mutableStateOf(listOf<Long>()) }
+
+    val isDm = conversationId != "PUBLIC"
+    val titleText = if (isDm) {
+        val identity = knownIdentities.values.find { it.fullId == conversationId }
+        identity?.displayName ?: "Direct Message"
+    } else {
+        "Sawa Mesh"
+    }
+    
+    val subtitleText = if (isDm) {
+        "Private End-to-End Encrypted"
+    } else {
+        if (meshActive && peerCount > 0)
+            "$peerCount peer${if (peerCount > 1) "s" else ""} online"
+        else if (meshActive) "scanning…"
+        else "mesh inactive"
+    }
 
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = ColorHeader),
@@ -210,7 +290,7 @@ private fun ChatTopBar(peerCount: Int, meshActive: Boolean, onSosClick: () -> Un
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Hub,
+                        imageVector = if (isDm) Icons.Rounded.Person else Icons.Rounded.Hub,
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(22.dp)
@@ -219,16 +299,13 @@ private fun ChatTopBar(peerCount: Int, meshActive: Boolean, onSosClick: () -> Un
                 Spacer(Modifier.width(10.dp))
                 Column {
                     Text(
-                        "Sawa Mesh",
+                        titleText,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
                     )
                     Text(
-                        if (meshActive && peerCount > 0)
-                            "$peerCount peer${if (peerCount > 1) "s" else ""} online"
-                        else if (meshActive) "scanning…"
-                        else "mesh inactive",
+                        subtitleText,
                         color = ColorTextSecondary,
                         fontSize = 12.sp
                     )

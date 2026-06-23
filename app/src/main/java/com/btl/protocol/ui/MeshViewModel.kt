@@ -53,6 +53,9 @@ class MeshViewModel @Inject constructor(
     /** True when the mesh service is running and BLE is active. */
     val meshActive: StateFlow<Boolean> = BtlMeshService.meshActive
 
+    /** Map of node IDs to PeerIdentity (Full Fingerprint + Display Name) */
+    val knownIdentities: StateFlow<Map<String, BtlMeshService.Companion.PeerIdentity>> = BtlMeshService.knownIdentities
+
     // ──────────────────────────────────────────────────────────────────────────
     // Public actions
     // ──────────────────────────────────────────────────────────────────────────

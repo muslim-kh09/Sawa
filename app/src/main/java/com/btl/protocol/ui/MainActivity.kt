@@ -95,13 +95,14 @@ class MainActivity : ComponentActivity() {
                 val btOn = bluetoothEnabled
 
                 if (pGranted && btOn) {
-                    var currentChat by remember { mutableStateOf<String?>(null) }
-                    if (currentChat == null) {
-                        com.btl.protocol.ui.screens.ConversationsScreen(onNavigateToChat = { currentChat = it })
-                    } else {
-                        androidx.activity.compose.BackHandler { currentChat = null }
-                        ChatScreen(conversationId = currentChat!!)
+                    var currentChat by remember { mutableStateOf("PUBLIC") }
+                    androidx.activity.compose.BackHandler(enabled = currentChat != "PUBLIC") {
+                        currentChat = "PUBLIC"
                     }
+                    ChatScreen(
+                        conversationId = currentChat,
+                        onNavigateToDm = { currentChat = it }
+                    )
                 } else {
                     OnboardingScreen(
                         permissionsGranted = pGranted,
