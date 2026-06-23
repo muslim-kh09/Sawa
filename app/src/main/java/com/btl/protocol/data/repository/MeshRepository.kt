@@ -14,7 +14,8 @@ import javax.inject.Singleton
 @Singleton
 class MeshRepository @Inject constructor(
     private val messageDao: MessageDao,
-    private val packetLedgerDao: PacketLedgerDao
+    private val packetLedgerDao: PacketLedgerDao,
+    private val sessionKeyDao: SessionKeyDao
 ) {
     // ──────────────────────────────────────────────────────────────────────────
     // Messages
@@ -60,9 +61,21 @@ class MeshRepository @Inject constructor(
         packetLedgerDao.pruneExpiredPackets(System.currentTimeMillis())
     }
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // Session Keys
+    // ──────────────────────────────────────────────────────────────────────────
+
+    suspend fun getSessionKey(fingerprint: String): SessionKeyEntity? =
+        sessionKeyDao.getSessionKey(fingerprint)
+
+    suspend fun saveSessionKey(entity: SessionKeyEntity) {
+        sessionKeyDao.insertSessionKey(entity)
+    }
+
     /** PANIC MODE: Instantly purges all messages and packet history from the database. */
     suspend fun purgeDatabase() {
         messageDao.deleteAllMessages()
         packetLedgerDao.deleteAllPackets()
+        sessionKeyDao.deleteAllSessionKeys()
     }
 }

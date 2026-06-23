@@ -40,7 +40,10 @@ data class Message(
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
     val status: Int = STATUS_PENDING,
-    val senderName: String? = null
+    val senderName: String? = null,
+    val conversationId: String = "PUBLIC",
+    val signature: ByteArray? = null,
+    val isEncrypted: Boolean = false
 )
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -67,6 +70,18 @@ interface PacketLedgerDao {
 
     @Query("DELETE FROM packet_ledger")
     suspend fun deleteAllPackets()
+}
+
+@Dao
+interface SessionKeyDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSessionKey(sessionKey: SessionKeyEntity)
+
+    @Query("SELECT * FROM session_keys WHERE remoteFingerprint = :fingerprint")
+    suspend fun getSessionKey(fingerprint: String): SessionKeyEntity?
+
+    @Query("DELETE FROM session_keys")
+    suspend fun deleteAllSessionKeys()
 }
 
 @Dao
@@ -97,13 +112,14 @@ interface MessageDao {
 // ══════════════════════════════════════════════════════════════════════════════
 
 @Database(
-    entities = [PacketLedgerEntity::class, Message::class],
-    version = 6,
+    entities = [PacketLedgerEntity::class, Message::class, SessionKeyEntity::class],
+    version = 7,
     exportSchema = false
 )
 abstract class MeshDatabase : RoomDatabase() {
     abstract fun packetLedgerDao(): PacketLedgerDao
     abstract fun messageDao(): MessageDao
+    abstract fun sessionKeyDao(): SessionKeyDao
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

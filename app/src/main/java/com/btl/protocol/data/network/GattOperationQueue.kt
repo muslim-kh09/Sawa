@@ -9,6 +9,8 @@ import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private const val TAG = "GattOpQueue"
 private const val TARGET_MTU = 512
@@ -49,11 +51,16 @@ class GattOperationQueue(
     private val scope: CoroutineScope
 ) {
     private val channel = Channel<GattWriteOp>(Channel.UNLIMITED)
+    private val queueMutex = Mutex()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val dispatcher = Dispatchers.IO.limitedParallelism(1)
 
     init {
-        scope.launch(Dispatchers.IO) {
+        scope.launch(dispatcher) {
             for (op in channel) {
-                processWithRetry(op)
+                queueMutex.withLock {
+                    processWithRetry(op)
+                }
                 delay(INTER_OP_COOLDOWN_MS)
             }
         }
