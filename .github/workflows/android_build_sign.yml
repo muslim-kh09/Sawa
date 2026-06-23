@@ -47,7 +47,8 @@ jobs:
 
       - name: Install NDK 26.1 and CMake 3.22
         run: |
-          sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
+          yes | sdkmanager --licenses || true
+          yes | sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
           echo "NDK installed at: $ANDROID_SDK_ROOT/ndk/26.1.10909125"
 
