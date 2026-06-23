@@ -85,7 +85,7 @@ class BtlMeshService : Service() {
             var pubKeyBase64 = prefs.getString("publicKey", null)
             if (pubKeyBase64 == null) {
                 val kpg = java.security.KeyPairGenerator.getInstance(android.security.keystore.KeyProperties.KEY_ALGORITHM_EC)
-                kpg.initialize(256)
+                kpg.initialize(256, java.security.SecureRandom())
                 val kp = kpg.generateKeyPair()
                 pubKeyBase64 = android.util.Base64.encodeToString(kp.public.encoded, android.util.Base64.NO_WRAP)
                 prefs.edit().putString("publicKey", pubKeyBase64).apply()
@@ -153,8 +153,7 @@ class BtlMeshService : Service() {
          * Builds an outgoing payload using the live service's sequence number counter.
          * Returns null if the service is not currently running.
          */
-        fun buildPayloadStatic(text: String): ByteArray? {
-            val msgId = java.util.UUID.randomUUID().toString()
+        fun buildPayloadStatic(text: String, msgId: String = java.util.UUID.randomUUID().toString()): ByteArray? {
             processedMessageIds.add(msgId)
             val newText = "$msgId|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$text"
             return liveService?.buildOutgoingPayload(newText)
@@ -407,7 +406,7 @@ class BtlMeshService : Service() {
             processedMessageIds.add(msgId)
 
             meshRepository.addMessage(
-                Message(isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = dName)
+                Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = dName)
             )
             Log.i(TAG, "✉ Delivered message from mesh: \"$actualText\" from $dName")
         } else if (parts.size == 3) {
@@ -420,13 +419,13 @@ class BtlMeshService : Service() {
             processedMessageIds.add(msgId)
 
             meshRepository.addMessage(
-                Message(isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = "Unknown")
+                Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = "Unknown")
             )
             Log.i(TAG, "✉ Delivered message from mesh: \"$actualText\"")
         } else {
             // Legacy plaintext
             meshRepository.addMessage(
-                Message(isMe = false, text = text, status = STATUS_DELIVERED)
+                Message(messageId = java.util.UUID.randomUUID().toString(), isMe = false, text = text, status = STATUS_DELIVERED)
             )
             Log.i(TAG, "✉ Delivered message from mesh: \"$text\"")
         }

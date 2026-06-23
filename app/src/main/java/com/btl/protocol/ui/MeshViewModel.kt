@@ -69,12 +69,14 @@ class MeshViewModel @Inject constructor(
     fun sendMessage(text: String) {
         if (text.isBlank()) return
         viewModelScope.launch {
+            val msgId = java.util.UUID.randomUUID().toString()
             val rowId = repository.addMessage(
-                Message(isMe = true, text = text, status = STATUS_PENDING)
+                Message(messageId = msgId, isMe = true, text = text, status = STATUS_PENDING)
             )
+            if (rowId == -1L) return@launch
             Log.d(TAG, "Message inserted, rowId=$rowId, enqueuing transmission…")
 
-            val payload = BtlMeshService.buildPayloadStatic(text)
+            val payload = BtlMeshService.buildPayloadStatic(text, msgId)
             if (payload == null) {
                 Log.w(TAG, "Service not running — cannot build payload for message $rowId")
                 return@launch

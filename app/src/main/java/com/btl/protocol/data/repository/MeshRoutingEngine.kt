@@ -29,9 +29,13 @@ data class PacketLedgerEntity(
     override fun hashCode(): Int = packetId.hashCode()
 }
 
-@Entity(tableName = "messages")
+@Entity(
+    tableName = "messages",
+    indices = [Index(value = ["messageId"], unique = true)]
+)
 data class Message(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val messageId: String = java.util.UUID.randomUUID().toString(),
     val isMe: Boolean,
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
@@ -69,7 +73,7 @@ interface PacketLedgerDao {
 interface MessageDao {
 
     /** Returns the rowId of the inserted row — use as a stable ID for status updates. */
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertMessage(message: Message): Long
 
     @Query("SELECT * FROM messages ORDER BY timestamp ASC")

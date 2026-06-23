@@ -87,8 +87,7 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .consumeWindowInsets(padding)
-                .imePadding()
+                .consumeWindowInsets(ScaffoldDefaults.contentWindowInsets)
                 .background(ColorBackground)
         ) {
             // ── Network status banner
@@ -408,7 +407,6 @@ private fun MessageInputBar(
             .fillMaxWidth()
             .background(ColorBackground)
             .padding(horizontal = 8.dp, vertical = 8.dp)
-            .navigationBarsPadding()
             .imePadding(),
         verticalAlignment = Alignment.Bottom
     ) {
