@@ -97,6 +97,12 @@ class BtlMeshService : Service() {
         @Volatile private var liveService: BtlMeshService? = null
 
         /**
+         * Builds an outgoing payload using the live service's sequence number counter.
+         * Returns null if the service is not currently running.
+         */
+        fun buildPayloadStatic(text: String): ByteArray? = liveService?.buildOutgoingPayload(text)
+
+        /**
          * Enqueues a text message for broadcast to all currently known peers.
          * Called by [MeshViewModel] — thread-safe.
          *
@@ -104,12 +110,6 @@ class BtlMeshService : Service() {
          * @param messageId Room DB row ID for status tracking.
          * @param onResult  Called with true on successful delivery to ≥1 peer.
          */
-        /**
-         * Builds an outgoing payload using the live service's sequence number counter.
-         * Returns null if the service is not currently running.
-         */
-        fun buildPayloadStatic(text: String): ByteArray? = liveService?.buildOutgoingPayload(text)
-
         fun enqueueTransmit(payload: ByteArray, messageId: Long, onResult: (Boolean) -> Unit = {}) {
             val queue = liveQueue ?: run {
                 Log.w(TAG, "enqueueTransmit called but service is not running")

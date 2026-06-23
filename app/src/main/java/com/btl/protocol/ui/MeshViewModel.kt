@@ -72,9 +72,6 @@ class MeshViewModel @Inject constructor(
             )
             Log.d(TAG, "Message inserted, rowId=$rowId, enqueuing transmission…")
 
-            val service = BtlMeshService  // static companion
-            // Build the payload — we need a running service instance for sequence numbers.
-            // We use the companion's buildOutgoingPayload via a live reference check.
             val payload = BtlMeshService.buildPayloadStatic(text)
             if (payload == null) {
                 Log.w(TAG, "Service not running — cannot build payload for message $rowId")
