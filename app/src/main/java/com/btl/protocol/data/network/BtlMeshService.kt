@@ -264,23 +264,21 @@ class BtlMeshService : Service() {
         // Active Mesh Anti-Entropy (Vector Clock Sync)
         serviceScope.launch {
             while (true) {
-                delay(30_000L) // Broadcast Vector Clock every 30 seconds
                 if (_meshActive.value) {
                     val allIds = meshRepository.getAllMessageIds()
-                    if (allIds.isNotEmpty()) {
-                        val recentIds = allIds.takeLast(20)
-                        val syncPayload = "SYNC|${recentIds.joinToString(",")}|$LOCAL_DEVICE_ID|$DISPLAY_NAME"
-                        val payload = buildOutgoingPayload(syncPayload)
-                        
-                        // Enqueue to all peers safely
-                        val live = liveQueue
-                        if (live != null) {
-                            peerRegistry.all().forEach { peer ->
-                                live.enqueue(GattWriteOp(device = peer.device, payload = payload))
-                            }
+                    val recentIds = if (allIds.isNotEmpty()) allIds.takeLast(20) else emptyList()
+                    val syncPayload = "SYNC|${recentIds.joinToString(",")}|$LOCAL_DEVICE_ID|$DISPLAY_NAME"
+                    val payload = buildOutgoingPayload(syncPayload)
+                    
+                    // Enqueue to all peers safely
+                    val live = liveQueue
+                    if (live != null) {
+                        peerRegistry.all().forEach { peer ->
+                            live.enqueue(GattWriteOp(device = peer.device, payload = payload))
                         }
                     }
                 }
+                delay(10_000L) // Broadcast Vector Clock every 10 seconds for faster identity resolution
             }
         }
 
@@ -475,6 +473,7 @@ class BtlMeshService : Service() {
                     Message(messageId = msgId, isMe = false, text = cleanedText, status = STATUS_DELIVERED, senderName = dName, conversationId = sId)
                 )
                 Log.i(TAG, "✉ Delivered DM from mesh: \"$cleanedText\" from $dName")
+                showDmNotification(dName, cleanedText)
             } else if (!isForSomeoneElse) {
                 // It's a PUBLIC message
                 meshRepository.addMessage(
@@ -705,7 +704,16 @@ class BtlMeshService : Service() {
             "Sawa Mesh",
             NotificationManager.IMPORTANCE_LOW
         ).apply { description = "Maintains the Sawa offline mesh network" }
-        getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+        
+        val dmChannel = NotificationChannel(
+            "DM_CHANNEL",
+            "Direct Messages",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply { description = "Notifications for private messages" }
+
+        val nm = getSystemService(NotificationManager::class.java)
+        nm?.createNotificationChannel(channel)
+        nm?.createNotificationChannel(dmChannel)
     }
 
     private fun buildNotification(): Notification =
@@ -715,4 +723,15 @@ class BtlMeshService : Service() {
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)
             .build()
+            
+    private fun showDmNotification(senderName: String, text: String) {
+        val nm = getSystemService(NotificationManager::class.java) ?: return
+        val notif = Notification.Builder(this, "DM_CHANNEL")
+            .setContentTitle("Private Message from $senderName")
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setAutoCancel(true)
+            .build()
+        nm.notify(senderName.hashCode(), notif)
+    }
 }

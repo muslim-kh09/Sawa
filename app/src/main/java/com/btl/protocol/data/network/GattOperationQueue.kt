@@ -151,14 +151,14 @@ class GattOperationQueue(
                         BluetoothProfile.STATE_CONNECTED -> {
                             Log.d(TAG, "[${op.device.address}] Connected — requesting MTU $TARGET_MTU")
                             scope.launch {
-                                delay(600) // Stabilize connection before MTU negotiation
+                                delay(100) // Stabilize connection before MTU negotiation
                                 try {
                                     if (!gatt.requestMtu(TARGET_MTU)) {
                                         Log.w(TAG, "requestMtu failed, falling back to MTU 23")
                                         negotiatedMtu = 23
                                         fragments = PacketFragmenter.fragment(op.payload, 20)
                                         fragIndex = 0
-                                        delay(200)
+                                        delay(50)
                                         if (!gatt.discoverServices()) settle(false)
                                     }
                                 } catch (e: SecurityException) {
@@ -185,7 +185,7 @@ class GattOperationQueue(
                     fragments = PacketFragmenter.fragment(op.payload, maxPayload)
                     fragIndex = 0
                     scope.launch {
-                        delay(200) // Delay before discoverServices
+                        delay(50) // Delay before discoverServices
                         try {
                             if (!gatt.discoverServices()) {
                                 Log.e(TAG, "discoverServices rejected synchronously")
