@@ -96,17 +96,26 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       # ─────────────────────────────────────────────────────────────────────────
-      # 9. Upload APK as workflow artifact (all runs)
+      # 9. Extract Version for Artifact and Release
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Extract Version
+        id: ext_version
+        run: |
+          VERSION_NAME=$(grep -E 'versionName\s*=\s*".*"' app/build.gradle.kts | awk -F '"' '{print $2}')
+          echo "version=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 10. Upload APK as workflow artifact (all runs)
       # ─────────────────────────────────────────────────────────────────────────
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Sawa-Release-v1.0.${{ github.run_number }}
+          name: Sawa-Release-v${{ steps.ext_version.outputs.version }}
           path: app/build/outputs/apk/release/app-release.apk
           retention-days: 30
 
       # ─────────────────────────────────────────────────────────────────────────
-      # 10. GitHub Release (main / release branch only)
+      # 11. GitHub Release (main / release branch only)
       # ─────────────────────────────────────────────────────────────────────────
       - name: Read Release Notes
         id: release_notes
@@ -126,12 +135,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/app-release.apk
-          tag_name: "v1.0.${{ github.run_number }}"
-          name: "Sawa v1.0.${{ github.run_number }}"
+          tag_name: "v${{ steps.ext_version.outputs.version }}"
+          name: "Sawa v${{ steps.ext_version.outputs.version }}"
           body: |
             ## Sawa BLE Mesh Chat
             
-            **Build:** `${{ github.run_number }}`
             **Commit:** `${{ github.sha }}`
             
             ### Release Notes
