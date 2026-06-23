@@ -74,6 +74,12 @@ class BtlMeshService : Service() {
         /** Default broadcast TTL — packets relay up to 7 hops. */
         private const val BROADCAST_TTL: Byte = 7
 
+        /** Unique identifier for this device instance to prevent self-echoes. */
+        val LOCAL_DEVICE_ID = java.util.UUID.randomUUID().toString()
+
+        /** Tracks seen message UUIDs to deduplicate echoes from the broadcast mesh. */
+        val processedMessageIds = mutableSetOf<String>()
+
         /** SHA-256 of "SAWA_BROADCAST_IDENTITY" — used as the senderHash for all nodes. */
         val BROADCAST_SENDER_HASH: ByteArray by lazy {
             MessageDigest.getInstance("SHA-256").digest("SAWA_BROADCAST_IDENTITY".toByteArray())
@@ -100,7 +106,12 @@ class BtlMeshService : Service() {
          * Builds an outgoing payload using the live service's sequence number counter.
          * Returns null if the service is not currently running.
          */
-        fun buildPayloadStatic(text: String): ByteArray? = liveService?.buildOutgoingPayload(text)
+        fun buildPayloadStatic(text: String): ByteArray? {
+            val msgId = java.util.UUID.randomUUID().toString()
+            processedMessageIds.add(msgId)
+            val newText = "$msgId|$LOCAL_DEVICE_ID|$text"
+            return liveService?.buildOutgoingPayload(newText)
+        } 
 
         /**
          * Enqueues a text message for broadcast to all currently known peers.
@@ -331,11 +342,28 @@ class BtlMeshService : Service() {
             return
         }
 
-        // Deliver to UI
-        meshRepository.addMessage(
-            Message(isMe = false, text = text, status = STATUS_DELIVERED)
-        )
-        Log.i(TAG, "✉ Delivered message from mesh: \"$text\"")
+        // Deduplication and Self-echo drop
+        val parts = text.split("|", limit = 3)
+        if (parts.size == 3) {
+            val msgId = parts[0]
+            val sId = parts[1]
+            val actualText = parts[2]
+            
+            if (sId == LOCAL_DEVICE_ID) return // drop self-echo
+            if (processedMessageIds.contains(msgId)) return
+            processedMessageIds.add(msgId)
+
+            meshRepository.addMessage(
+                Message(isMe = false, text = actualText, status = STATUS_DELIVERED)
+            )
+            Log.i(TAG, "✉ Delivered message from mesh: \"$actualText\"")
+        } else {
+            // Legacy plaintext
+            meshRepository.addMessage(
+                Message(isMe = false, text = text, status = STATUS_DELIVERED)
+            )
+            Log.i(TAG, "✉ Delivered message from mesh: \"$text\"")
+        }
 
         // Relay with decremented TTL (Store-Carry-Forward)
         val newTtl = (ttl - 1).toByte()

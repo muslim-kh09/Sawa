@@ -12,6 +12,7 @@ import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.*
@@ -35,9 +36,9 @@ import java.util.*
 
 private val ColorHeader        = Color(0xFF075E54)
 private val ColorHeaderLight   = Color(0xFF128C7E)
-private val ColorBackground    = Color(0xFF111B21)   // Dark mode background
-private val ColorBubbleMe      = Color(0xFF005C4B)   // Dark teal — sent
-private val ColorBubblePeer    = Color(0xFF1F2C34)   // Dark slate — received
+private val ColorBackground    = Color(0xFF0D1117)   // Dark Navy/Black background
+private val ColorBubbleMe      = Color(0xFF005C4B)   // WhatsApp Green — sent
+private val ColorBubblePeer    = Color(0xFF202C33)   // Dark Gray — received
 private val ColorInputBg       = Color(0xFF1F2C34)
 private val ColorSendBtn       = Color(0xFF00A884)
 private val ColorPeerOnline    = Color(0xFF25D366)
@@ -59,6 +60,7 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
 
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val context = LocalContext.current
 
     // Auto-scroll to the latest message
     LaunchedEffect(messages.size) {
@@ -68,8 +70,9 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
     }
 
     Scaffold(
+        modifier = Modifier.imePadding().systemBarsPadding(),
         containerColor = ColorBackground,
-        topBar = { ChatTopBar(peerCount = peerCount, meshActive = meshActive, onSosClick = { viewModel.sendSos() }) },
+        topBar = { ChatTopBar(peerCount = peerCount, meshActive = meshActive, onSosClick = { viewModel.sendSos(context) }) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -265,8 +268,8 @@ private fun MessageBubble(message: Message) {
                 .clip(
                     RoundedCornerShape(
                         topStart = 18.dp, topEnd = 18.dp,
-                        bottomStart = if (isMe) 18.dp else 4.dp,
-                        bottomEnd = if (isMe) 4.dp else 18.dp
+                        bottomStart = if (isMe) 18.dp else 0.dp,
+                        bottomEnd = if (isMe) 0.dp else 18.dp
                     )
                 )
                 .background(if (isMe) ColorBubbleMe else ColorBubblePeer)

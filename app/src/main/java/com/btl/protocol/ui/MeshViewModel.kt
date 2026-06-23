@@ -1,5 +1,7 @@
 package com.btl.protocol.ui
 
+import android.annotation.SuppressLint
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -92,9 +94,25 @@ class MeshViewModel @Inject constructor(
     }
 
     /**
-     * Sends an SOS broadcast with maximum priority.
+     * Sends an SOS broadcast with maximum priority and appends location.
      */
-    fun sendSos() {
-        sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+    @SuppressLint("MissingPermission")
+    fun sendSos(context: Context) {
+        try {
+            val client = com.google.android.gms.location.LocationServices.getFusedLocationClient(context)
+            client.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    val lat = String.format(java.util.Locale.US, "%.4f", location.latitude)
+                    val lon = String.format(java.util.Locale.US, "%.4f", location.longitude)
+                    sendMessage("[🆘 SOS] I need immediate help! Location: $lat, $lon. Please relay.")
+                } else {
+                    sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+                }
+            }.addOnFailureListener {
+                sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+            }
+        } catch (e: Exception) {
+            sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+        }
     }
 }

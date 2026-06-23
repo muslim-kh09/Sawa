@@ -15,7 +15,7 @@ private const val TARGET_MTU = 512
 private const val GATT_TIMEOUT_MS = 12_000L
 private const val MAX_RETRIES = 3
 private const val RETRY_BASE_DELAY_MS = 500L
-private const val INTER_OP_COOLDOWN_MS = 150L
+private const val INTER_OP_COOLDOWN_MS = 20L
 
 /**
  * Represents a single write request to a remote BLE peer.

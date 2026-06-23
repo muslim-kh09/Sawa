@@ -101,4 +101,7 @@ dependencies {
     // 6. Lifecycle & Activity Core Extensions
     implementation("androidx.activity:activity-compose:1.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.0")
+
+    // 7. Location Services
+    implementation("com.google.android.gms:play-services-location:21.2.0")
 }
