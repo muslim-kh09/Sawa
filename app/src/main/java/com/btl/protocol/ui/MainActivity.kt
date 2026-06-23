@@ -13,6 +13,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -40,8 +52,9 @@ import dagger.hilt.android.AndroidEntryPoint
  * - Navigation is reactive: State objects drive which screen is shown.
  */
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
+    private var appUnlocked by mutableStateOf(false)
     private var permissionsGranted by mutableStateOf(false)
     private var bluetoothEnabled by mutableStateOf(false)
     private var availableUpdate by mutableStateOf<OtaUpdateManager.UpdateInfo?>(null)
@@ -111,7 +124,23 @@ class MainActivity : ComponentActivity() {
                 val pGranted = permissionsGranted
                 val btOn = bluetoothEnabled
 
-                if (pGranted && btOn) {
+                if (!appUnlocked) {
+                    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Default.Lock, contentDescription = "Locked", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Sawa is Locked", style = MaterialTheme.typography.headlineMedium)
+                            Spacer(modifier = Modifier.height(32.dp))
+                            Button(onClick = { authenticateUser() }) {
+                                Text("Unlock")
+                            }
+                        }
+                    }
+                } else if (pGranted && btOn) {
                     var currentChat by remember { mutableStateOf("PUBLIC") }
                     androidx.activity.compose.BackHandler(enabled = currentChat != "PUBLIC") {
                         currentChat = "PUBLIC"
@@ -156,6 +185,37 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        
+        // Launch Biometric Prompt on startup
+        authenticateUser()
+    }
+
+    private fun authenticateUser() {
+        val biometricManager = BiometricManager.from(this)
+        val canAuthenticate = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+        
+        if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
+            // No biometric/pin hardware or not set up. Just let them in.
+            appUnlocked = true
+            return
+        }
+
+        val executor = ContextCompat.getMainExecutor(this)
+        val biometricPrompt = BiometricPrompt(this, executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    appUnlocked = true
+                }
+            })
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Unlock Sawa")
+            .setSubtitle("Use your fingerprint or device PIN to access your secure chats")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
     }
 
     override fun onDestroy() {

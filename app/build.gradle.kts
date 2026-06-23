@@ -107,4 +107,8 @@ dependencies {
 
     // 8. Cryptography (Tink for X25519, Ed25519, ChaCha20-Poly1305)
     implementation("com.google.crypto.tink:tink-android:1.8.0")
+    
+    // 9. Biometrics and App Lock
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
 }

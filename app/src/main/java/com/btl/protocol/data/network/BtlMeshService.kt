@@ -765,10 +765,19 @@ class BtlMeshService : Service() {
             
     private fun showDmNotification(senderName: String, text: String) {
         val nm = getSystemService(NotificationManager::class.java) ?: return
+        
+        val intent = Intent(this, com.btl.protocol.ui.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            this, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notif = Notification.Builder(this, "DM_CHANNEL")
             .setContentTitle("Private Message from $senderName")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
         nm.notify(senderName.hashCode(), notif)
