@@ -20,6 +20,9 @@ import com.btl.protocol.data.network.BtlMeshService
 import com.btl.protocol.ui.screens.ChatScreen
 import com.btl.protocol.ui.screens.OnboardingScreen
 import com.btl.protocol.ui.theme.SawaTheme
+import com.btl.protocol.data.ota.OtaUpdateManager
+import com.btl.protocol.BuildConfig
+import kotlinx.coroutines.launch
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -41,6 +44,7 @@ class MainActivity : ComponentActivity() {
 
     private var permissionsGranted by mutableStateOf(false)
     private var bluetoothEnabled by mutableStateOf(false)
+    private var availableUpdate by mutableStateOf<OtaUpdateManager.UpdateInfo?>(null)
 
     // ──────────────────────────────────────────────────────────────────────────
     // Permission + BT launchers
@@ -89,6 +93,14 @@ class MainActivity : ComponentActivity() {
 
         refreshState()
 
+        // Check for OTA updates in the background
+        androidx.lifecycle.lifecycleScope.launch {
+            val update = OtaUpdateManager.checkForUpdates(BuildConfig.VERSION_NAME)
+            if (update != null) {
+                availableUpdate = update
+            }
+        }
+
         setContent {
             SawaTheme {
                 val pGranted = permissionsGranted
@@ -112,6 +124,28 @@ class MainActivity : ComponentActivity() {
                             bluetoothLauncher.launch(
                                 Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
                             )
+                        }
+                    )
+                }
+
+                // Show OTA Update Dialog if available
+                availableUpdate?.let { update ->
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { availableUpdate = null },
+                        title = { androidx.compose.material3.Text("Update Available: v${update.versionName}") },
+                        text = { androidx.compose.material3.Text(update.releaseNotes) },
+                        confirmButton = {
+                            androidx.compose.material3.TextButton(onClick = {
+                                availableUpdate = null
+                                OtaUpdateManager.downloadAndInstall(this@MainActivity, update.downloadUrl)
+                            }) {
+                                androidx.compose.material3.Text("Download & Install")
+                            }
+                        },
+                        dismissButton = {
+                            androidx.compose.material3.TextButton(onClick = { availableUpdate = null }) {
+                                androidx.compose.material3.Text("Later")
+                            }
                         }
                     )
                 }

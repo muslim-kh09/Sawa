@@ -147,7 +147,10 @@ class BtlMeshService : Service() {
          */
         fun buildPayloadStatic(text: String, msgId: String = java.util.UUID.randomUUID().toString(), conversationId: String = "PUBLIC"): ByteArray? {
             processedMessageIds.add(msgId)
-            val newText = "$msgId|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$conversationId|$text"
+            // If it's a DM, we embed the target inside the text using a prefix that old devices will render cleanly,
+            // or we handle it in the application layer. For now, we revert to 4 parts to restore global chat.
+            val finalText = if (conversationId != "PUBLIC") "[$conversationId] $text" else text
+            val newText = "$msgId|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$finalText"
             return liveService?.buildOutgoingPayload(newText)
         } 
 
@@ -436,7 +439,8 @@ class BtlMeshService : Service() {
             missingInRemote.forEach { missingId ->
                 val msg = meshRepository.getMessageById(missingId)
                 if (msg != null) {
-                    val relayText = "${msg.messageId}|$LOCAL_DEVICE_ID|${msg.senderName ?: "Unknown"}|${msg.conversationId}|${msg.text}"
+                    val finalText = if (msg.conversationId != "PUBLIC") "[${msg.conversationId}] ${msg.text}" else msg.text
+                    val relayText = "${msg.messageId}|$LOCAL_DEVICE_ID|${msg.senderName ?: "Unknown"}|$finalText"
                     val relayPayload = buildOutgoingPayload(relayText)
                     gattQueue.enqueue(GattWriteOp(device = peerDevice, payload = relayPayload))
                 }
@@ -445,27 +449,8 @@ class BtlMeshService : Service() {
         }
 
         // Deduplication and Self-echo drop
-        val parts = text.split("|", limit = 5)
-        if (parts.size == 5) {
-            val msgId = parts[0]
-            val sId = parts[1]
-            val dName = parts[2]
-            val convId = parts[3]
-            val actualText = parts[4]
-            
-            if (sId == LOCAL_DEVICE_ID) return // drop self-echo
-            updateIdentity(sId, dName)
-            if (processedMessageIds.contains(msgId)) return
-            processedMessageIds.add(msgId)
-
-            val localConvId = if (convId == LOCAL_DEVICE_ID) sId else "PUBLIC"
-            if (convId == "PUBLIC" || convId == LOCAL_DEVICE_ID) {
-                meshRepository.addMessage(
-                    Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = dName, conversationId = localConvId)
-                )
-                Log.i(TAG, "✉ Delivered message from mesh: \"$actualText\" from $dName")
-            }
-        } else if (parts.size == 4) {
+        val parts = text.split("|", limit = 4)
+        if (parts.size == 4) {
             val msgId = parts[0]
             val sId = parts[1]
             val dName = parts[2]
@@ -476,10 +461,29 @@ class BtlMeshService : Service() {
             if (processedMessageIds.contains(msgId)) return
             processedMessageIds.add(msgId)
 
-            meshRepository.addMessage(
-                Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = dName)
-            )
-            Log.i(TAG, "✉ Delivered message from mesh: \"$actualText\" from $dName")
+            // Extract conversationId from text if it's a DM
+            val convIdPrefix = "[$LOCAL_DEVICE_ID] "
+            val isForMe = actualText.startsWith(convIdPrefix)
+            val isForSomeoneElse = actualText.matches(Regex("^\\[[a-fA-F0-9]{16}\\] .*"))
+
+            if (isForMe) {
+                // It's a DM directed to me
+                val cleanedText = actualText.removePrefix(convIdPrefix)
+                meshRepository.addMessage(
+                    Message(messageId = msgId, isMe = false, text = cleanedText, status = STATUS_DELIVERED, senderName = dName, conversationId = sId)
+                )
+                Log.i(TAG, "✉ Delivered DM from mesh: \"$cleanedText\" from $dName")
+            } else if (!isForSomeoneElse) {
+                // It's a PUBLIC message
+                meshRepository.addMessage(
+                    Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = dName, conversationId = "PUBLIC")
+                )
+                Log.i(TAG, "✉ Delivered public message from mesh: \"$actualText\" from $dName")
+            } else {
+                // It's a DM for someone else. Store it for relaying, but don't show it in our UI.
+                // Or we can just drop UI delivery, but keep it in processedMessageIds so we relay it via SCF.
+                Log.i(TAG, "✉ Relaying DM intended for another peer.")
+            }
         } else if (parts.size == 3) {
             val msgId = parts[0]
             val sId = parts[1]
