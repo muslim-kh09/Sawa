@@ -57,9 +57,12 @@ class BtlMeshService : Service() {
         
         wifiP2pManager = getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
         wifiP2pChannel = wifiP2pManager.initialize(this, mainLooper, null)
-        
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startBleMesh()
         startWifiDirectDiscovery()
+        return START_STICKY
     }
 
     private fun createNotificationChannel() {
@@ -86,6 +89,18 @@ class BtlMeshService : Service() {
         val scanner = bluetoothAdapter.bluetoothLeScanner
         val advertiser = bluetoothAdapter.bluetoothLeAdvertiser
 
+        if (scanner == null || advertiser == null) {
+            Log.e("BtlMeshService", "BLE Scanner or Advertiser is null, Bluetooth might be off.")
+            return
+        }
+
+        try {
+            scanner.stopScan(bleScanCallback)
+            advertiser.stopAdvertising(advCallback)
+        } catch (e: Exception) {
+            // Ignore
+        }
+
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
@@ -95,7 +110,8 @@ class BtlMeshService : Service() {
             .build()
 
         try {
-            scanner?.startScan(listOf(filter), settings, bleScanCallback)
+            scanner.startScan(listOf(filter), settings, bleScanCallback)
+            Log.d("BtlMeshService", "BLE Scanning started with UUID filter.")
         } catch (e: SecurityException) {
             Log.e("BtlMeshService", "SecurityException starting BLE scan", e)
         }
@@ -113,7 +129,8 @@ class BtlMeshService : Service() {
             .build()
 
         try {
-            advertiser?.startAdvertising(advSettings, advData, advCallback)
+            advertiser.startAdvertising(advSettings, advData, advCallback)
+            Log.d("BtlMeshService", "BLE Advertising requested with UUID payload.")
         } catch (e: SecurityException) {
             Log.e("BtlMeshService", "SecurityException starting BLE advertising", e)
         }

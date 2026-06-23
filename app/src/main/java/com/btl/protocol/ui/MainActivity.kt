@@ -2,7 +2,10 @@ package com.btl.protocol.ui
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -27,6 +30,7 @@ import com.btl.protocol.ui.screens.EmergencyDashboardScreen
 class MainActivity : ComponentActivity() {
     
     private var allPermissionsGranted by mutableStateOf(false)
+    private var bluetoothEnabled by mutableStateOf(false)
     private lateinit var db: MeshDatabase
 
     private val permissionLauncher = registerForActivityResult(
@@ -34,6 +38,7 @@ class MainActivity : ComponentActivity() {
     ) { permissions ->
         val granted = permissions.entries.all { it.value }
         if (granted) {
+            allPermissionsGranted = true
             checkBluetoothAndStart()
         } else {
             allPermissionsGranted = false
@@ -44,10 +49,22 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
-            allPermissionsGranted = true
+            bluetoothEnabled = true
             startMeshService()
         } else {
-            allPermissionsGranted = false
+            bluetoothEnabled = false
+        }
+    }
+
+    private val btStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                bluetoothEnabled = (state == BluetoothAdapter.STATE_ON)
+                if (bluetoothEnabled && allPermissionsGranted) {
+                    startMeshService()
+                }
+            }
         }
     }
 
@@ -58,22 +75,60 @@ class MainActivity : ComponentActivity() {
             .fallbackToDestructiveMigration()
             .build()
         
-        requestPermissions()
+        registerReceiver(btStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+        checkInitialStates()
 
         lifecycle.addObserver(LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                if (!allPermissionsGranted) {
-                    requestPermissions()
-                }
+                checkInitialStates()
             }
         })
 
         setContent {
-            if (allPermissionsGranted) {
+            val permissionsOk = allPermissionsGranted
+            val btOk = bluetoothEnabled
+            
+            if (permissionsOk && btOk) {
                 EmergencyDashboardScreen(db.messageDao())
             } else {
-                OnboardingScreen(onRetry = { requestPermissions() })
+                OnboardingScreen(
+                    onStartClicked = { requestPermissions() },
+                    permissionsGranted = permissionsOk,
+                    btEnabled = btOk,
+                    onEnableBtClicked = { 
+                        bluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) 
+                    }
+                )
             }
+        }
+    }
+
+    private fun checkInitialStates() {
+        val permissionsToRequest = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.BLUETOOTH,
+            Manifest.permission.BLUETOOTH_ADMIN
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissionsToRequest.add(Manifest.permission.BLUETOOTH_SCAN)
+            permissionsToRequest.add(Manifest.permission.BLUETOOTH_ADVERTISE)
+            permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        
+        val granted = permissionsToRequest.all { 
+            checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED 
+        }
+        allPermissionsGranted = granted
+
+        val bm = getSystemService(android.bluetooth.BluetoothManager::class.java)
+        bluetoothEnabled = bm.adapter?.isEnabled == true
+        
+        if (allPermissionsGranted && bluetoothEnabled) {
+            startMeshService()
         }
     }
 
@@ -102,7 +157,7 @@ class MainActivity : ComponentActivity() {
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             bluetoothLauncher.launch(enableBtIntent)
         } else {
-            allPermissionsGranted = true
+            bluetoothEnabled = true
             startMeshService()
         }
     }
@@ -115,10 +170,15 @@ class MainActivity : ComponentActivity() {
             startService(intent)
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterReceiver(btStateReceiver)
+    }
 }
 
 @Composable
-fun OnboardingScreen(onRetry: () -> Unit) {
+fun OnboardingScreen(onStartClicked: () -> Unit, permissionsGranted: Boolean, btEnabled: Boolean, onEnableBtClicked: () -> Unit) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier.fillMaxSize().padding(32.dp),
@@ -131,14 +191,27 @@ fun OnboardingScreen(onRetry: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "To build a secure, zero-latency offline mesh network, Sawa needs access to your Location and Bluetooth.\n\nPlease grant the required permissions when prompted so devices can discover each other.",
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Spacer(modifier = Modifier.height(32.dp))
-            Button(onClick = onRetry) {
-                Text("Grant Permissions & Continue")
+            
+            if (!permissionsGranted) {
+                Text(
+                    text = "To build a secure, zero-latency offline mesh network, Sawa needs access to your Location and Bluetooth.\n\nPlease grant the required permissions when prompted so devices can discover each other.",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(onClick = onStartClicked) {
+                    Text("Start Sawa (Grant Permissions)")
+                }
+            } else if (!btEnabled) {
+                Text(
+                    text = "Permissions granted! Now we just need Bluetooth turned on to connect to the Mesh.",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(onClick = onEnableBtClicked) {
+                    Text("Enable Bluetooth")
+                }
             }
         }
     }
