@@ -34,6 +34,7 @@ import com.btl.protocol.ui.theme.SawaTheme
 import com.btl.protocol.data.ota.OtaUpdateManager
 import kotlinx.coroutines.launch
 import androidx.lifecycle.lifecycleScope
+import com.btl.protocol.ui.utils.parseMarkdown
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -176,7 +177,7 @@ class MainActivity : FragmentActivity() {
                     androidx.compose.material3.AlertDialog(
                         onDismissRequest = { availableUpdate = null },
                         title = { androidx.compose.material3.Text("Update Available: v${update.versionName}") },
-                        text = { androidx.compose.material3.Text(update.releaseNotes) },
+                        text = { androidx.compose.material3.Text(update.releaseNotes.parseMarkdown()) },
                         confirmButton = {
                             androidx.compose.material3.TextButton(onClick = {
                                 availableUpdate = null
