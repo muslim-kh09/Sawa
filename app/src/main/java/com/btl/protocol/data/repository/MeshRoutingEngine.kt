@@ -35,7 +35,8 @@ data class Message(
     val isMe: Boolean,
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val status: Int = STATUS_PENDING
+    val status: Int = STATUS_PENDING,
+    val senderName: String? = null
 )
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -87,7 +88,7 @@ interface MessageDao {
 
 @Database(
     entities = [PacketLedgerEntity::class, Message::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class MeshDatabase : RoomDatabase() {

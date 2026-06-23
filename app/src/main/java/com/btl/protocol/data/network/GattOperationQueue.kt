@@ -143,17 +143,21 @@ class GattOperationQueue(
                     when (newState) {
                         BluetoothProfile.STATE_CONNECTED -> {
                             Log.d(TAG, "[${op.device.address}] Connected — requesting MTU $TARGET_MTU")
-                            try {
-                                if (!gatt.requestMtu(TARGET_MTU)) {
-                                    Log.w(TAG, "requestMtu failed, falling back to MTU 23")
-                                    negotiatedMtu = 23
-                                    fragments = PacketFragmenter.fragment(op.payload, 20)
-                                    fragIndex = 0
-                                    if (!gatt.discoverServices()) settle(false)
+                            scope.launch {
+                                delay(600) // Stabilize connection before MTU negotiation
+                                try {
+                                    if (!gatt.requestMtu(TARGET_MTU)) {
+                                        Log.w(TAG, "requestMtu failed, falling back to MTU 23")
+                                        negotiatedMtu = 23
+                                        fragments = PacketFragmenter.fragment(op.payload, 20)
+                                        fragIndex = 0
+                                        delay(200)
+                                        if (!gatt.discoverServices()) settle(false)
+                                    }
+                                } catch (e: SecurityException) {
+                                    Log.e(TAG, "SecurityException requestMtu", e)
+                                    settle(false)
                                 }
-                            } catch (e: SecurityException) {
-                                Log.e(TAG, "SecurityException requestMtu", e)
-                                settle(false)
                             }
                         }
                         BluetoothProfile.STATE_DISCONNECTED -> {
@@ -173,14 +177,17 @@ class GattOperationQueue(
                     val maxPayload = negotiatedMtu - 3  // subtract ATT header overhead
                     fragments = PacketFragmenter.fragment(op.payload, maxPayload)
                     fragIndex = 0
-                    try {
-                        if (!gatt.discoverServices()) {
-                            Log.e(TAG, "discoverServices rejected synchronously")
+                    scope.launch {
+                        delay(200) // Delay before discoverServices
+                        try {
+                            if (!gatt.discoverServices()) {
+                                Log.e(TAG, "discoverServices rejected synchronously")
+                                settle(false)
+                            }
+                        } catch (e: SecurityException) {
+                            Log.e(TAG, "SecurityException discoverServices", e)
                             settle(false)
                         }
-                    } catch (e: SecurityException) {
-                        Log.e(TAG, "SecurityException discoverServices", e)
-                        settle(false)
                     }
                 }
 

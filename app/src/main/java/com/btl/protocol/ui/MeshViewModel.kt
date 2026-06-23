@@ -127,4 +127,10 @@ class MeshViewModel @Inject constructor(
             Log.e(TAG, "🚨 PANIC MODE ACTIVATED. All data wiped.")
         }
     }
+
+    fun updateDisplayName(context: Context, newName: String) {
+        if (newName.isNotBlank()) {
+            BtlMeshService.updateDisplayName(context, newName.trim())
+        }
+    }
 }

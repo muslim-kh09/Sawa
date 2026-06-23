@@ -61,6 +61,7 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val context = LocalContext.current
+    var showEditNameDialog by remember { mutableStateOf(false) }
 
     // Auto-scroll to the latest message
     LaunchedEffect(messages.size) {
@@ -70,14 +71,15 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
     }
 
     Scaffold(
-        modifier = Modifier.imePadding().systemBarsPadding(),
+        modifier = Modifier.fillMaxSize(),
         containerColor = ColorBackground,
         topBar = { 
             ChatTopBar(
                 peerCount = peerCount, 
                 meshActive = meshActive, 
                 onSosClick = { viewModel.sendSos(context) },
-                onPanicClick = { viewModel.panicWipe() }
+                onPanicClick = { viewModel.panicWipe() },
+                onEditNameClick = { showEditNameDialog = true }
             ) 
         },
     ) { padding ->
@@ -85,6 +87,8 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding()
                 .background(ColorBackground)
         ) {
             // ── Network status banner
@@ -132,6 +136,41 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
             )
         }
     }
+
+    if (showEditNameDialog) {
+        var newName by remember { mutableStateOf(com.btl.protocol.data.network.BtlMeshService.DISPLAY_NAME) }
+        AlertDialog(
+            onDismissRequest = { showEditNameDialog = false },
+            title = { Text("Edit Display Name", color = ColorTextPrimary) },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedTextColor = ColorTextPrimary,
+                        unfocusedTextColor = ColorTextPrimary,
+                        focusedContainerColor = ColorInputBg,
+                        unfocusedContainerColor = ColorInputBg
+                    )
+                )
+            },
+            containerColor = ColorBackground,
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.updateDisplayName(context, newName)
+                    showEditNameDialog = false
+                }) {
+                    Text("Save", color = ColorSendBtn)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditNameDialog = false }) {
+                    Text("Cancel", color = ColorTextSecondary)
+                }
+            }
+        )
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -140,7 +179,7 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChatTopBar(peerCount: Int, meshActive: Boolean, onSosClick: () -> Unit, onPanicClick: () -> Unit) {
+private fun ChatTopBar(peerCount: Int, meshActive: Boolean, onSosClick: () -> Unit, onPanicClick: () -> Unit, onEditNameClick: () -> Unit) {
     var tapTimes by remember { mutableStateOf(listOf<Long>()) }
 
     TopAppBar(
@@ -195,6 +234,9 @@ private fun ChatTopBar(peerCount: Int, meshActive: Boolean, onSosClick: () -> Un
             }
         },
         actions = {
+            IconButton(onClick = onEditNameClick) {
+                Icon(Icons.Filled.Edit, contentDescription = "Edit Name", tint = Color.White)
+            }
             // SOS button
             IconButton(
                 onClick = onSosClick,
@@ -294,6 +336,15 @@ private fun MessageBubble(message: Message) {
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             Column {
+                if (!isMe && message.senderName != null) {
+                    Text(
+                        text = message.senderName,
+                        color = ColorPeerOnline,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
                 // Message text
                 Text(
                     text = message.text,

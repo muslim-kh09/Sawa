@@ -74,10 +74,10 @@ class BtlMeshService : Service() {
         /** Default broadcast TTL — packets relay up to 7 hops. */
         private const val BROADCAST_TTL: Byte = 7
 
-        /** Unique identifier for this device instance to prevent self-echoes. */
         var LOCAL_DEVICE_ID = ""
         var NODE_ID_BYTES = ByteArray(8)
         var NODE_ID_STRING = ""
+        var DISPLAY_NAME = ""
 
         fun initIdentity(context: Context) {
             if (LOCAL_DEVICE_ID.isNotEmpty()) return
@@ -95,6 +95,18 @@ class BtlMeshService : Service() {
             LOCAL_DEVICE_ID = hash.joinToString("") { "%02x".format(it) }.take(16)
             NODE_ID_BYTES = LOCAL_DEVICE_ID.toByteArray(Charsets.UTF_8).take(8).toByteArray()
             NODE_ID_STRING = String(NODE_ID_BYTES, Charsets.UTF_8)
+            
+            DISPLAY_NAME = prefs.getString("displayName", "") ?: ""
+            if (DISPLAY_NAME.isEmpty()) {
+                val hexKey = android.util.Base64.decode(pubKeyBase64!!, android.util.Base64.NO_WRAP).joinToString("") { "%02x".format(it) }
+                DISPLAY_NAME = "Sawa_" + hexKey.take(4)
+                prefs.edit().putString("displayName", DISPLAY_NAME).apply()
+            }
+        }
+        
+        fun updateDisplayName(context: Context, newName: String) {
+            DISPLAY_NAME = newName
+            context.getSharedPreferences("SawaIdentity", Context.MODE_PRIVATE).edit().putString("displayName", newName).apply()
         }
 
         /** Tracks seen message UUIDs to deduplicate echoes from the broadcast mesh. */
@@ -144,7 +156,7 @@ class BtlMeshService : Service() {
         fun buildPayloadStatic(text: String): ByteArray? {
             val msgId = java.util.UUID.randomUUID().toString()
             processedMessageIds.add(msgId)
-            val newText = "$msgId|$LOCAL_DEVICE_ID|$text"
+            val newText = "$msgId|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$text"
             return liveService?.buildOutgoingPayload(newText)
         } 
 
@@ -383,8 +395,22 @@ class BtlMeshService : Service() {
         }
 
         // Deduplication and Self-echo drop
-        val parts = text.split("|", limit = 3)
-        if (parts.size == 3) {
+        val parts = text.split("|", limit = 4)
+        if (parts.size == 4) {
+            val msgId = parts[0]
+            val sId = parts[1]
+            val dName = parts[2]
+            val actualText = parts[3]
+            
+            if (sId == LOCAL_DEVICE_ID) return // drop self-echo
+            if (processedMessageIds.contains(msgId)) return
+            processedMessageIds.add(msgId)
+
+            meshRepository.addMessage(
+                Message(isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = dName)
+            )
+            Log.i(TAG, "✉ Delivered message from mesh: \"$actualText\" from $dName")
+        } else if (parts.size == 3) {
             val msgId = parts[0]
             val sId = parts[1]
             val actualText = parts[2]
@@ -394,7 +420,7 @@ class BtlMeshService : Service() {
             processedMessageIds.add(msgId)
 
             meshRepository.addMessage(
-                Message(isMe = false, text = actualText, status = STATUS_DELIVERED)
+                Message(isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = "Unknown")
             )
             Log.i(TAG, "✉ Delivered message from mesh: \"$actualText\"")
         } else {
