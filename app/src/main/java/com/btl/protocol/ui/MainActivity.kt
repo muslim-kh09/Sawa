@@ -3,10 +3,8 @@ package com.btl.protocol.ui
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,10 +13,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.room.Room
 import com.btl.protocol.data.network.BtlMeshService
+import com.btl.protocol.data.repository.MeshDatabase
 import dagger.hilt.android.AndroidEntryPoint
 import com.btl.protocol.ui.screens.EmergencyDashboardScreen
 
@@ -26,6 +27,7 @@ import com.btl.protocol.ui.screens.EmergencyDashboardScreen
 class MainActivity : ComponentActivity() {
     
     private var allPermissionsGranted by mutableStateOf(false)
+    private lateinit var db: MeshDatabase
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -44,7 +46,6 @@ class MainActivity : ComponentActivity() {
         if (result.resultCode == RESULT_OK) {
             allPermissionsGranted = true
             startMeshService()
-            checkBatteryOptimization()
         } else {
             allPermissionsGranted = false
         }
@@ -52,6 +53,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(saved: Bundle?) {
         super.onCreate(saved)
+        
+        db = Room.databaseBuilder(applicationContext, MeshDatabase::class.java, "btl_mesh_ledger.db")
+            .fallbackToDestructiveMigration()
+            .build()
         
         requestPermissions()
 
@@ -65,21 +70,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             if (allPermissionsGranted) {
-                EmergencyDashboardScreen()
+                EmergencyDashboardScreen(db.messageDao())
             } else {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("Permissions are required for the Mesh Network", color = MaterialTheme.colorScheme.error)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { requestPermissions() }) {
-                            Text("Grant Permissions")
-                        }
-                    }
-                }
+                OnboardingScreen(onRetry = { requestPermissions() })
             }
         }
     }
@@ -111,19 +104,6 @@ class MainActivity : ComponentActivity() {
         } else {
             allPermissionsGranted = true
             startMeshService()
-            checkBatteryOptimization()
-        }
-    }
-
-    private fun checkBatteryOptimization() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = getSystemService(android.os.PowerManager::class.java)
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                startActivity(intent)
-            }
         }
     }
 
@@ -133,6 +113,33 @@ class MainActivity : ComponentActivity() {
             startForegroundService(intent)
         } else {
             startService(intent)
+        }
+    }
+}
+
+@Composable
+fun OnboardingScreen(onRetry: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Welcome to Sawa",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "To build a secure, zero-latency offline mesh network, Sawa needs access to your Location and Bluetooth.\n\nPlease grant the required permissions when prompted so devices can discover each other.",
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+            Button(onClick = onRetry) {
+                Text("Grant Permissions & Continue")
+            }
         }
     }
 }

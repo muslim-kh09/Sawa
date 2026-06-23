@@ -37,9 +37,27 @@ interface PacketLedgerDao {
     suspend fun isPacketReplayed(senderHash: String, sequenceNumber: Int): Int
 }
 
-@Database(entities = [PacketLedgerEntity::class], version = 1, exportSchema = false)
+@Entity(tableName = "messages")
+data class Message(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val isMe: Boolean,
+    val text: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface MessageDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMessage(message: Message)
+
+    @Query("SELECT * FROM messages ORDER BY timestamp ASC")
+    fun getMessages(): Flow<List<Message>>
+}
+
+@Database(entities = [PacketLedgerEntity::class, Message::class], version = 2, exportSchema = false)
 abstract class MeshDatabase : RoomDatabase() {
     abstract fun packetLedgerDao(): PacketLedgerDao
+    abstract fun messageDao(): MessageDao
 }
 
 class MeshRoutingEngine(context: Context) {

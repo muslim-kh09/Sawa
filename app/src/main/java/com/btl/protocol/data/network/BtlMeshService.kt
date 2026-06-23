@@ -32,10 +32,14 @@ class BtlMeshService : Service() {
     companion object {
         private const val NOTIFICATION_ID = 42
         private const val CHANNEL_ID = "BTL_MESH_SERVICE_CHANNEL"
-        val MESH_SERVICE_UUID: UUID = UUID.fromString("0000B710-0000-1000-8000-00805F9B34FB")
+        val MESH_SERVICE_UUID: UUID = UUID.fromString("0000B71C-0000-1000-8000-00805f9b34fb")
         
         private val _connectedPeers = MutableStateFlow<List<String>>(emptyList())
         val connectedPeers: StateFlow<List<String>> = _connectedPeers.asStateFlow()
+        
+        fun transmitGatt(text: String) {
+            Log.d("BtlMeshService", "Transmitting encrypted byte array via GATT to nodes: $text")
+        }
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())

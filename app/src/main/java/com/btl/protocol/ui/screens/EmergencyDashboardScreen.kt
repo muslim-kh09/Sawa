@@ -3,6 +3,7 @@ package com.btl.protocol.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,15 +19,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.btl.protocol.data.network.BtlMeshService
+import com.btl.protocol.data.repository.MessageDao
+import com.btl.protocol.data.repository.Message
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EmergencyDashboardScreen() {
+fun EmergencyDashboardScreen(messageDao: MessageDao) {
     val connectedPeers by BtlMeshService.connectedPeers.collectAsState()
     var messageText by remember { mutableStateOf("") }
-    val messages = remember { mutableStateListOf(
-        Pair("system", "Channel encrypted (X25519) & verified (Ed25519)"),
-    ) }
+    val messages by messageDao.getMessages().collectAsState(initial = emptyList())
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -35,7 +39,11 @@ fun EmergencyDashboardScreen() {
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF075E54)),
                 actions = {
                     IconButton(onClick = {
-                        messages.add(Pair("me", "[SOS] I need help!"))
+                        coroutineScope.launch(Dispatchers.IO) {
+                            val sosMsg = "[SOS] I need help!"
+                            messageDao.insertMessage(Message(isMe = true, text = sosMsg))
+                            BtlMeshService.transmitGatt(sosMsg)
+                        }
                     }) {
                         Icon(imageVector = Icons.Default.Warning, contentDescription = "SOS", tint = Color.Red)
                     }
@@ -51,7 +59,7 @@ fun EmergencyDashboardScreen() {
         ) {
             if (connectedPeers.isEmpty()) {
                 Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF128C7E)).padding(4.dp), contentAlignment = Alignment.Center) {
-                    Text("Scanning for peers...", color = Color.White, fontSize = 12.sp)
+                    Text("Scanning for Sawa peers...", color = Color.White, fontSize = 12.sp)
                 }
             } else {
                 Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF25D366)).padding(4.dp), contentAlignment = Alignment.Center) {
@@ -63,23 +71,19 @@ fun EmergencyDashboardScreen() {
                 modifier = Modifier.weight(1f).padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(messages.size) { index ->
-                    val msg = messages[index]
-                    val isMe = msg.first == "me"
-                    val isSystem = msg.first == "system"
-
+                items(messages) { msg ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = if (isSystem) Arrangement.Center else if (isMe) Arrangement.End else Arrangement.Start
+                        horizontalArrangement = if (msg.isMe) Arrangement.End else Arrangement.Start
                     ) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSystem) Color(0xFFFFF59D) else if (isMe) Color(0xFFDCF8C6) else Color.White)
+                                .background(if (msg.isMe) Color(0xFFDCF8C6) else Color.White)
                                 .padding(12.dp)
                                 .widthIn(max = 280.dp)
                         ) {
-                            Text(text = msg.second, color = Color.Black, fontSize = 14.sp)
+                            Text(text = msg.text, color = Color.Black, fontSize = 14.sp)
                         }
                     }
                 }
@@ -105,8 +109,12 @@ fun EmergencyDashboardScreen() {
                 FloatingActionButton(
                     onClick = {
                         if (messageText.isNotBlank()) {
-                            messages.add(Pair("me", messageText))
+                            val textToSend = messageText
                             messageText = ""
+                            coroutineScope.launch(Dispatchers.IO) {
+                                messageDao.insertMessage(Message(isMe = true, text = textToSend))
+                                BtlMeshService.transmitGatt(textToSend)
+                            }
                         }
                     },
                     containerColor = Color(0xFF128C7E),
