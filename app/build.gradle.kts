@@ -104,4 +104,7 @@ dependencies {
 
     // 7. Location Services
     implementation("com.google.android.gms:play-services-location:21.2.0")
+
+    // 8. Cryptography (Tink for X25519, Ed25519, ChaCha20-Poly1305)
+    implementation("com.google.crypto.tink:tink-android:1.8.0")
 }

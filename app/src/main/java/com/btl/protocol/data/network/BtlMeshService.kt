@@ -17,6 +17,7 @@ import com.btl.protocol.data.repository.STATUS_DELIVERED
 import com.btl.protocol.data.repository.STATUS_SENT
 import com.btl.protocol.data.repository.STATUS_PENDING
 import com.btl.protocol.data.repository.MeshRoutingEngine
+import com.btl.protocol.data.crypto.IdentityManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -80,31 +81,7 @@ class BtlMeshService : Service() {
         var DISPLAY_NAME = ""
 
         fun initIdentity(context: Context) {
-            if (LOCAL_DEVICE_ID.isNotEmpty()) return
-            val prefs = context.getSharedPreferences("SawaIdentityV2", Context.MODE_PRIVATE)
-            var pubKeyBase64 = prefs.getString("publicKey", null)
-            if (pubKeyBase64 == null) {
-                val kpg = java.security.KeyPairGenerator.getInstance("EC")
-                val random = java.security.SecureRandom()
-                random.setSeed(java.util.UUID.randomUUID().toString().toByteArray())
-                random.setSeed(System.nanoTime())
-                kpg.initialize(256, random)
-                val kp = kpg.generateKeyPair()
-                pubKeyBase64 = android.util.Base64.encodeToString(kp.public.encoded, android.util.Base64.NO_WRAP)
-                prefs.edit().putString("publicKey", pubKeyBase64).apply()
-            }
-            val digest = MessageDigest.getInstance("SHA-256")
-            val hash = digest.digest(pubKeyBase64!!.toByteArray(Charsets.UTF_8))
-            LOCAL_DEVICE_ID = hash.joinToString("") { "%02x".format(it) }.take(16)
-            NODE_ID_BYTES = LOCAL_DEVICE_ID.toByteArray(Charsets.UTF_8).take(8).toByteArray()
-            NODE_ID_STRING = String(NODE_ID_BYTES, Charsets.UTF_8)
-            
-            DISPLAY_NAME = prefs.getString("displayName", "") ?: ""
-            if (DISPLAY_NAME.isEmpty()) {
-                val hexKey = android.util.Base64.decode(pubKeyBase64!!, android.util.Base64.NO_WRAP).joinToString("") { "%02x".format(it) }
-                DISPLAY_NAME = "Sawa_" + hexKey.take(4)
-                prefs.edit().putString("displayName", DISPLAY_NAME).apply()
-            }
+            // Identity is now initialized via Hilt-injected IdentityManager in onCreate()
         }
         
         fun updateDisplayName(context: Context, newName: String) {
@@ -208,6 +185,7 @@ class BtlMeshService : Service() {
 
     @Inject lateinit var meshRepository: MeshRepository
     @Inject lateinit var routingEngine: MeshRoutingEngine
+    @Inject lateinit var identityManager: IdentityManager
 
     // ──────────────────────────────────────────────────────────────────────────
     // Service State
@@ -227,7 +205,19 @@ class BtlMeshService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        initIdentity(this)
+        
+        val fingerprint = identityManager.getPublicFingerprint()
+        LOCAL_DEVICE_ID = fingerprint.take(16)
+        NODE_ID_BYTES = fingerprint.toByteArray(Charsets.UTF_8).take(8).toByteArray()
+        NODE_ID_STRING = String(NODE_ID_BYTES, Charsets.UTF_8)
+        
+        val prefs = getSharedPreferences("SawaIdentityV2", Context.MODE_PRIVATE)
+        DISPLAY_NAME = prefs.getString("displayName", "") ?: ""
+        if (DISPLAY_NAME.isEmpty()) {
+            DISPLAY_NAME = "Sawa_" + fingerprint.take(4)
+            prefs.edit().putString("displayName", DISPLAY_NAME).apply()
+        }
+
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
 

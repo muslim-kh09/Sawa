@@ -66,6 +66,10 @@ class AndroidKeyStoreWrapper @Inject constructor() {
         return cipher.doFinal(ciphertext)
     }
 
+    fun wrapKey(keyData: ByteArray): ByteArray = encrypt(keyData)
+
+    fun unwrapKey(wrappedData: ByteArray): ByteArray = decrypt(wrappedData)
+
     // ──────────────────────────────────────────────────────────────────────────
     // Internal
     // ──────────────────────────────────────────────────────────────────────────
