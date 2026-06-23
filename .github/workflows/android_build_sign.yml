@@ -108,6 +108,19 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────────
       # 10. GitHub Release (main / release branch only)
       # ─────────────────────────────────────────────────────────────────────────
+      - name: Read Release Notes
+        id: release_notes
+        run: |
+          if [ -f RELEASE_NOTES.md ]; then
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            echo "Automated Release Build" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release'
         uses: softprops/action-gh-release@v2
@@ -116,19 +129,13 @@ jobs:
           tag_name: "v1.0.${{ github.run_number }}"
           name: "Sawa v1.0.${{ github.run_number }}"
           body: |
-            ## Sawa BLE Mesh Chat — Automated Release
-
+            ## Sawa BLE Mesh Chat
+            
             **Build:** `${{ github.run_number }}`
             **Commit:** `${{ github.sha }}`
-            **Branch:** `${{ github.ref_name }}`
-
-            ### What's in this release
-            - Decentralized BLE mesh networking (no internet required)
-            - GATT operation queue with MTU negotiation + payload fragmentation
-            - Store-Carry-Forward multi-hop message relay (TTL=7)
-            - Replay attack defense via distributed packet ledger
-            - AES-256-GCM local encryption (TEE / StrongBox backed)
-            - libsodium Ed25519 + X25519 + Double Ratchet primitives (NDK)
+            
+            ### Release Notes
+            ${{ steps.release_notes.outputs.notes }}
           draft: false
           prerelease: false
         env:

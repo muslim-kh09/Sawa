@@ -1,0 +1,4 @@
+- Improved Bluetooth performance and stability
+- Removed App Lock default requirement
+- Added In-App Popups for Direct Messages
+- Added global Markdown support (bold, italic, strikethrough, code)
