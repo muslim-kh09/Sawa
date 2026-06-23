@@ -11,6 +11,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
 
 private const val TAG = "GattOpQueue"
 private const val TARGET_MTU = 512
@@ -50,29 +51,29 @@ class GattOperationQueue(
     private val context: Context,
     private val scope: CoroutineScope
 ) {
-    private val channel = Channel<GattWriteOp>(Channel.UNLIMITED)
-    private val queueMutex = Mutex()
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val dispatcher = Dispatchers.IO.limitedParallelism(1)
-
-    init {
-        scope.launch(dispatcher) {
-            for (op in channel) {
-                queueMutex.withLock {
-                    processWithRetry(op)
-                }
-                delay(INTER_OP_COOLDOWN_MS)
-            }
-        }
-    }
+    private val deviceChannels = ConcurrentHashMap<String, Channel<GattWriteOp>>()
 
     /** Enqueues a write operation. Thread-safe. */
     fun enqueue(op: GattWriteOp) {
+        val mac = op.device.address
+        val channel = deviceChannels.getOrPut(mac) {
+            val newChannel = Channel<GattWriteOp>(Channel.UNLIMITED)
+            scope.launch(Dispatchers.IO) {
+                for (queuedOp in newChannel) {
+                    processWithRetry(queuedOp)
+                    delay(INTER_OP_COOLDOWN_MS)
+                }
+            }
+            newChannel
+        }
         channel.trySend(op)
     }
 
     /** Shuts down the queue — no more operations will be processed. */
-    fun close() = channel.close()
+    fun close() {
+        deviceChannels.values.forEach { it.close() }
+        deviceChannels.clear()
+    }
 
     // ──────────────────────────────────────────────────────────────────────────
     // Internal
@@ -228,7 +229,11 @@ class GattOperationQueue(
                         return
                     }
                     fragIndex++
-                    writeNext(gatt, characteristic)
+                    // BitChat Optimization: 30ms packet pacing to prevent hardware buffer overflow
+                    scope.launch {
+                        delay(30)
+                        writeNext(gatt, characteristic)
+                    }
                 }
             }
 
