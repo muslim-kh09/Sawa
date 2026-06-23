@@ -66,17 +66,17 @@ class MeshViewModel @Inject constructor(
      * 4. On completion, updates status to [STATUS_SENT] (≥1 peer ACKed) or leaves
      *    as PENDING if no peers were reachable.
      */
-    fun sendMessage(text: String) {
+    fun sendMessage(text: String, conversationId: String = "PUBLIC") {
         if (text.isBlank()) return
         viewModelScope.launch {
             val msgId = java.util.UUID.randomUUID().toString()
             val rowId = repository.addMessage(
-                Message(messageId = msgId, isMe = true, text = text, status = STATUS_PENDING)
+                Message(messageId = msgId, isMe = true, text = text, status = STATUS_PENDING, conversationId = conversationId)
             )
             if (rowId == -1L) return@launch
             Log.d(TAG, "Message inserted, rowId=$rowId, enqueuing transmission…")
 
-            val payload = BtlMeshService.buildPayloadStatic(text, msgId)
+            val payload = BtlMeshService.buildPayloadStatic(text, msgId, conversationId)
             if (payload == null) {
                 Log.w(TAG, "Service not running — cannot build payload for message $rowId")
                 return@launch

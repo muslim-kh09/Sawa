@@ -52,8 +52,11 @@ private val ColorTextSecondary = Color(0xFF8696A0)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
-    val messages   by viewModel.messages.collectAsState()
+fun ChatScreen(conversationId: String = "PUBLIC", viewModel: MeshViewModel = hiltViewModel()) {
+    val allMessages by viewModel.messages.collectAsState()
+    val messages = remember(allMessages, conversationId) {
+        allMessages.filter { it.conversationId == conversationId }
+    }
     val peers      by viewModel.peers.collectAsState()
     val meshActive by viewModel.meshActive.collectAsState()
     val peerCount = peers.size
@@ -129,7 +132,7 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
                     val toSend = inputText.trim()
                     if (toSend.isNotEmpty()) {
                         inputText = ""
-                        viewModel.sendMessage(toSend)
+                        viewModel.sendMessage(toSend, conversationId)
                     }
                 }
             )

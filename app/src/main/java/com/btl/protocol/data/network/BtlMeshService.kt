@@ -133,9 +133,9 @@ class BtlMeshService : Service() {
          * Builds an outgoing payload using the live service's sequence number counter.
          * Returns null if the service is not currently running.
          */
-        fun buildPayloadStatic(text: String, msgId: String = java.util.UUID.randomUUID().toString()): ByteArray? {
+        fun buildPayloadStatic(text: String, msgId: String = java.util.UUID.randomUUID().toString(), conversationId: String = "PUBLIC"): ByteArray? {
             processedMessageIds.add(msgId)
-            val newText = "$msgId|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$text"
+            val newText = "$msgId|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$conversationId|$text"
             return liveService?.buildOutgoingPayload(newText)
         } 
 
@@ -429,8 +429,26 @@ class BtlMeshService : Service() {
         }
 
         // Deduplication and Self-echo drop
-        val parts = text.split("|", limit = 4)
-        if (parts.size == 4) {
+        val parts = text.split("|", limit = 5)
+        if (parts.size == 5) {
+            val msgId = parts[0]
+            val sId = parts[1]
+            val dName = parts[2]
+            val convId = parts[3]
+            val actualText = parts[4]
+            
+            if (sId == LOCAL_DEVICE_ID) return // drop self-echo
+            if (processedMessageIds.contains(msgId)) return
+            processedMessageIds.add(msgId)
+
+            val localConvId = if (convId == LOCAL_DEVICE_ID) sId else "PUBLIC"
+            if (convId == "PUBLIC" || convId == LOCAL_DEVICE_ID) {
+                meshRepository.addMessage(
+                    Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = dName, conversationId = localConvId)
+                )
+                Log.i(TAG, "✉ Delivered message from mesh: \"$actualText\" from $dName")
+            }
+        } else if (parts.size == 4) {
             val msgId = parts[0]
             val sId = parts[1]
             val dName = parts[2]
@@ -635,7 +653,7 @@ class BtlMeshService : Service() {
      */
     fun buildOutgoingPayload(text: String): ByteArray {
         val seq = seqNum.getAndIncrement()
-        val senderHex = BROADCAST_SENDER_HASH.joinToString("") { "%02x".format(it) }
+        val senderHex = identityManager.getPublicFingerprint()
         return buildPayload(senderHex, seq, BROADCAST_TTL, text)
     }
 
