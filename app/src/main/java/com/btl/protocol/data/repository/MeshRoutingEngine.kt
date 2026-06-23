@@ -84,6 +84,12 @@ interface MessageDao {
 
     @Query("DELETE FROM messages")
     suspend fun deleteAllMessages()
+
+    @Query("SELECT messageId FROM messages")
+    suspend fun getAllMessageIds(): List<String>
+
+    @Query("SELECT * FROM messages WHERE messageId = :msgId LIMIT 1")
+    suspend fun getMessageById(msgId: String): Message?
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

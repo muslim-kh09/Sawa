@@ -109,7 +109,7 @@ class BtlMeshService : Service() {
         
         fun updateDisplayName(context: Context, newName: String) {
             DISPLAY_NAME = newName
-            context.getSharedPreferences("SawaIdentity", Context.MODE_PRIVATE).edit().putString("displayName", newName).apply()
+            context.getSharedPreferences("SawaIdentityV2", Context.MODE_PRIVATE).edit().putString("displayName", newName).apply()
         }
 
         /** Tracks seen message UUIDs to deduplicate echoes from the broadcast mesh. */
@@ -254,6 +254,29 @@ class BtlMeshService : Service() {
             }
         }
 
+        // Active Mesh Anti-Entropy (Vector Clock Sync)
+        serviceScope.launch {
+            while (true) {
+                delay(30_000L) // Broadcast Vector Clock every 30 seconds
+                if (_meshActive.value) {
+                    val allIds = meshRepository.getAllMessageIds()
+                    if (allIds.isNotEmpty()) {
+                        val recentIds = allIds.takeLast(20)
+                        val syncPayload = "SYNC|${recentIds.joinToString(",")}"
+                        val payload = buildOutgoingPayload(syncPayload)
+                        
+                        // Enqueue to all peers safely
+                        val live = liveQueue
+                        if (live != null) {
+                            peerRegistry.all().forEach { peer ->
+                                live.enqueue(GattWriteOp(device = peer.device, payload = payload))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Log.i(TAG, "Service created.")
     }
 
@@ -393,6 +416,25 @@ class BtlMeshService : Service() {
         val isNew = routingEngine.processIncomingPacket(senderHex, seq, ttl, payload)
         if (!isNew) {
             Log.d(TAG, "Dropped duplicate/expired packet $senderHex-$seq")
+            return
+        }
+
+        // --- Vector Sync Anti-Entropy Logic ---
+        if (text.startsWith("SYNC|")) {
+            val remoteIds = text.removePrefix("SYNC|").split(",")
+            val localIds = meshRepository.getAllMessageIds()
+            // Sync up to 20 missing messages to avoid flooding
+            val missingInRemote = localIds.filter { it !in remoteIds }.takeLast(20)
+            
+            val peerDevice = peerRegistry.all().find { it.address == senderAddress }?.device ?: return
+            missingInRemote.forEach { missingId ->
+                val msg = meshRepository.getMessageById(missingId)
+                if (msg != null) {
+                    val relayText = "${msg.messageId}|$LOCAL_DEVICE_ID|${msg.senderName ?: "Unknown"}|${msg.text}"
+                    val relayPayload = buildOutgoingPayload(relayText)
+                    gattQueue.enqueue(GattWriteOp(device = peerDevice, payload = relayPayload))
+                }
+            }
             return
         }
 

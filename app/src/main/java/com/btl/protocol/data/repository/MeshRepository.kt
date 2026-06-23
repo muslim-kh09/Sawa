@@ -39,6 +39,10 @@ class MeshRepository @Inject constructor(
         messageDao.updateStatus(id.toInt(), status)
     }
 
+    suspend fun getAllMessageIds(): List<String> = messageDao.getAllMessageIds()
+    
+    suspend fun getMessageById(msgId: String): Message? = messageDao.getMessageById(msgId)
+
     // ──────────────────────────────────────────────────────────────────────────
     // Packet Ledger
     // ──────────────────────────────────────────────────────────────────────────
