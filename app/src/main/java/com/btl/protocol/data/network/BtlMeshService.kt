@@ -285,7 +285,7 @@ class BtlMeshService : Service() {
             while (true) {
                 if (_meshActive.value) {
                     val allIds = meshRepository.getAllMessageIds()
-                    val recentIds = if (allIds.isNotEmpty()) allIds.takeLast(20) else emptyList()
+                    val recentIds = if (allIds.isNotEmpty()) allIds.takeLast(5) else emptyList()
                     val myPubKeyB64 = android.util.Base64.encodeToString(identityManager.x25519PublicKey, android.util.Base64.NO_WRAP)
                     val syncPayload = "SYNC|${recentIds.joinToString(",")}|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$myPubKeyB64"
                     val payload = buildOutgoingPayload(syncPayload)
@@ -298,7 +298,7 @@ class BtlMeshService : Service() {
                         }
                     }
                 }
-                delay(10_000L) // Broadcast Vector Clock every 10 seconds for faster identity resolution
+                delay(20_000L) // Broadcast Vector Clock every 20 seconds
             }
         }
 
@@ -453,8 +453,8 @@ class BtlMeshService : Service() {
             }
             val remoteIds = parts[1].split(",")
             val localIds = meshRepository.getAllMessageIds()
-            // Sync up to 20 missing messages to avoid flooding
-            val missingInRemote = localIds.filter { it !in remoteIds }.takeLast(20)
+            // Sync up to 5 missing messages to avoid flooding
+            val missingInRemote = localIds.filter { it !in remoteIds }.takeLast(5)
             
             val peerDevice = peerRegistry.all().find { it.address == senderAddress }?.device ?: return
             missingInRemote.forEach { missingId ->
