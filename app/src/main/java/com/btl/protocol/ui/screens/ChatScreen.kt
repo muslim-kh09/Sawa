@@ -55,6 +55,8 @@ private val ColorTextSecondary = Color(0xFF8696A0)
 fun ChatScreen(
     conversationId: String = "PUBLIC", 
     onNavigateToDm: (String) -> Unit = {},
+    isAppLockEnabled: Boolean = false,
+    onToggleAppLock: (Boolean) -> Unit = {},
     viewModel: MeshViewModel = hiltViewModel()
 ) {
     val allMessages by viewModel.messages.collectAsState()
@@ -89,6 +91,8 @@ fun ChatScreen(
                 meshActive = meshActive, 
                 conversationId = conversationId,
                 knownIdentities = knownIdentities,
+                isAppLockEnabled = isAppLockEnabled,
+                onToggleAppLock = onToggleAppLock,
                 onSosClick = { viewModel.sendSos(context) },
                 onPanicClick = { viewModel.panicWipe() },
                 onEditNameClick = { showEditNameDialog = true }
@@ -241,6 +245,8 @@ private fun ChatTopBar(
     meshActive: Boolean, 
     conversationId: String,
     knownIdentities: Map<String, com.btl.protocol.data.network.BtlMeshService.Companion.PeerIdentity>,
+    isAppLockEnabled: Boolean,
+    onToggleAppLock: (Boolean) -> Unit,
     onSosClick: () -> Unit, 
     onPanicClick: () -> Unit, 
     onEditNameClick: () -> Unit
@@ -313,6 +319,13 @@ private fun ChatTopBar(
             }
         },
         actions = {
+            IconButton(onClick = { onToggleAppLock(!isAppLockEnabled) }) {
+                Icon(
+                    imageVector = if (isAppLockEnabled) Icons.Filled.Lock else Icons.Filled.LockOpen, 
+                    contentDescription = "Toggle App Lock", 
+                    tint = Color.White
+                )
+            }
             IconButton(onClick = onEditNameClick) {
                 Icon(Icons.Filled.Edit, contentDescription = "Edit Name", tint = Color.White)
             }

@@ -54,6 +54,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
     private var appUnlocked by mutableStateOf(false)
+    private var isAppLockEnabled by mutableStateOf(false)
     private var permissionsGranted by mutableStateOf(false)
     private var bluetoothEnabled by mutableStateOf(false)
     private var availableUpdate by mutableStateOf<OtaUpdateManager.UpdateInfo?>(null)
@@ -103,6 +104,10 @@ class MainActivity : FragmentActivity() {
             if (event == Lifecycle.Event.ON_RESUME) refreshState()
         })
 
+        val prefs = getSharedPreferences("SawaSettings", Context.MODE_PRIVATE)
+        isAppLockEnabled = prefs.getBoolean("appLockEnabled", false)
+        if (!isAppLockEnabled) appUnlocked = true
+
         refreshState()
 
         // Check for OTA updates in the background
@@ -146,7 +151,12 @@ class MainActivity : FragmentActivity() {
                     }
                     ChatScreen(
                         conversationId = currentChat,
-                        onNavigateToDm = { currentChat = it }
+                        onNavigateToDm = { currentChat = it },
+                        isAppLockEnabled = isAppLockEnabled,
+                        onToggleAppLock = { enabled ->
+                            isAppLockEnabled = enabled
+                            getSharedPreferences("SawaSettings", Context.MODE_PRIVATE).edit().putBoolean("appLockEnabled", enabled).apply()
+                        }
                     )
                 } else {
                     OnboardingScreen(
@@ -185,8 +195,10 @@ class MainActivity : FragmentActivity() {
             }
         }
         
-        // Launch Biometric Prompt on startup
-        authenticateUser()
+        // Launch Biometric Prompt on startup if enabled
+        if (isAppLockEnabled) {
+            authenticateUser()
+        }
     }
 
     private fun authenticateUser() {
