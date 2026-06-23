@@ -74,36 +74,6 @@ fun ChatScreen(
     var showEditNameDialog by remember { mutableStateOf(false) }
     var showPeersDialog by remember { mutableStateOf(false) }
 
-    val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
-    var previousMessages by remember { mutableStateOf(allMessages) }
-
-    LaunchedEffect(allMessages) {
-        val newMsgs = allMessages - previousMessages.toSet()
-        previousMessages = allMessages
-        
-        for (msg in newMsgs) {
-            // Only alert for received messages that are NOT in the current chat
-            if (!msg.isMe && msg.conversationId != conversationId) {
-                val prefix = if (msg.conversationId == "PUBLIC") "[Global]" else "[DM]"
-                val sender = msg.senderName ?: "Someone"
-                // Shorten text if too long
-                val shortText = if (msg.text.length > 30) msg.text.take(30) + "..." else msg.text
-                
-                coroutineScope.launch {
-                    val result = snackbarHostState.showSnackbar(
-                        message = "$prefix $sender: $shortText",
-                        actionLabel = "View",
-                        duration = SnackbarDuration.Short
-                    )
-                    if (result == SnackbarResult.ActionPerformed) {
-                        onNavigateToDm(msg.conversationId)
-                    }
-                }
-            }
-        }
-    }
-
     // Auto-scroll to the latest message
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -115,7 +85,6 @@ fun ChatScreen(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets.systemBars,
         containerColor = ColorBackground,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = { 
             ChatTopBar(
                 peerCount = peerCount, 
@@ -470,7 +439,7 @@ private fun MessageBubble(message: Message) {
                 }
                 // Message text
                 Text(
-                    text = message.text,
+                    text = message.text.parseMarkdown(),
                     color = ColorTextPrimary,
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -642,5 +611,53 @@ private fun formatDate(ts: Long): String {
     return when {
         today.get(Calendar.DAY_OF_YEAR) == cal.get(Calendar.DAY_OF_YEAR) -> "Today"
         else -> SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).format(Date(ts))
+    }
+}
+
+private fun String.parseMarkdown(): androidx.compose.ui.text.AnnotatedString {
+    return androidx.compose.ui.text.buildAnnotatedString {
+        var currentIndex = 0
+        // Match bold, italic, strikethrough, and code
+        val pattern = Regex("(\\*\\*(.*?)\\*\\*)|(\\*(.*?)\\*)|(~~(.*?)~~)|(`(.*?)`)")
+        val matches = pattern.findAll(this@parseMarkdown)
+        
+        for (match in matches) {
+            val range = match.range
+            if (currentIndex < range.first) {
+                append(this@parseMarkdown.substring(currentIndex, range.first))
+            }
+            
+            val value = match.value
+            when {
+                value.startsWith("**") && value.endsWith("**") -> {
+                    pushStyle(androidx.compose.ui.text.SpanStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
+                    append(value.removeSurrounding("**"))
+                    pop()
+                }
+                value.startsWith("*") && value.endsWith("*") -> {
+                    pushStyle(androidx.compose.ui.text.SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic))
+                    append(value.removeSurrounding("*"))
+                    pop()
+                }
+                value.startsWith("~~") && value.endsWith("~~") -> {
+                    pushStyle(androidx.compose.ui.text.SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough))
+                    append(value.removeSurrounding("~~"))
+                    pop()
+                }
+                value.startsWith("`") && value.endsWith("`") -> {
+                    pushStyle(androidx.compose.ui.text.SpanStyle(
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        background = Color(0x33000000)
+                    ))
+                    append(value.removeSurrounding("`"))
+                    pop()
+                }
+            }
+            currentIndex = range.last + 1
+        }
+        
+        if (currentIndex < this@parseMarkdown.length) {
+            append(this@parseMarkdown.substring(currentIndex))
+        }
     }
 }
