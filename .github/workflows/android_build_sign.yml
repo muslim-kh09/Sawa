@@ -32,10 +32,9 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Setup Gradle 8.7
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.7'
           cache-read-only: false
 
       # ─────────────────────────────────────────────────────────────────────────
