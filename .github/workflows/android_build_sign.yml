@@ -16,56 +16,117 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ─────────────────────────────────────────────────────────────────────────
+      # 1. Checkout
+      # ─────────────────────────────────────────────────────────────────────────
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # ─────────────────────────────────────────────────────────────────────────
+      # 2. Java + Gradle (wrapper-based — avoids "gradle not found" on PATH)
+      # ─────────────────────────────────────────────────────────────────────────
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: 'gradle'
 
-      - name: Setup Android NDK
-        uses: android-actions/setup-android@v3
-        with:
-          ndk-version: '26.1.10909125'
-
-      # 🌟 استخدام أداة جرادل الرسمية لإجبار السيرفر على إصدار 8.7 المستقر (وتفعيل الكاش تلقائياً)
       - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.7'
+          cache-read-only: false
 
+      # ─────────────────────────────────────────────────────────────────────────
+      # 3. Android SDK + NDK
+      #    setup-android installs the SDK. NDK must be installed separately
+      #    via sdkmanager — the ndk-version key is NOT recognised by setup-android.
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK 26.1 and CMake 3.22
+        run: |
+          sdkmanager --install "ndk;26.1.10909125" "cmake;3.22.1"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> $GITHUB_ENV
+          echo "NDK installed at: $ANDROID_SDK_ROOT/ndk/26.1.10909125"
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 4. libsodium system dependency for FetchContent cache warm-up
+      #    The CMakeLists fetches libsodium-cmake via git at build time.
+      #    Install git + cmake build essentials so FetchContent works offline.
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Install Native Build Tools
+        run: sudo apt-get install -y ninja-build git
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 5. Keystore — decoded from base64 GitHub secret
+      # ─────────────────────────────────────────────────────────────────────────
       - name: Decode Release Keystore
         run: |
           mkdir -p ~/.android/
-          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode > /home/runner/.android/release-keystore.jks
+          echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 --decode \
+            > /home/runner/.android/release-keystore.jks
+          echo "KEYSTORE_PATH=/home/runner/.android/release-keystore.jks" >> $GITHUB_ENV
 
-      # تشغيل الفحوصات عبر أمر النظام المباشر
-      - name: Run Lint and Unit Tests
-        run: gradle lintRelease testReleaseUnitTest --no-daemon
+      # ─────────────────────────────────────────────────────────────────────────
+      # 6. Lint — abortOnError=false already set in build.gradle.kts
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Run Lint
+        run: ./gradlew lintRelease --no-daemon --stacktrace
 
-      - name: Build Release APK
+      # ─────────────────────────────────────────────────────────────────────────
+      # 7. Unit Tests
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Run Unit Tests
+        run: ./gradlew testReleaseUnitTest --no-daemon --stacktrace
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # 8. Release Build (signed)
+      # ─────────────────────────────────────────────────────────────────────────
+      - name: Build Signed Release APK
         env:
           KEYSTORE_PATH: /home/runner/.android/release-keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
+      # ─────────────────────────────────────────────────────────────────────────
+      # 9. Upload APK as workflow artifact (all runs)
+      # ─────────────────────────────────────────────────────────────────────────
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BTL-Release-APK
+          name: Sawa-Release-v1.0.${{ github.run_number }}
           path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
 
+      # ─────────────────────────────────────────────────────────────────────────
+      # 10. GitHub Release (main / release branch only)
+      # ─────────────────────────────────────────────────────────────────────────
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release'
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/app-release.apk
           tag_name: "v1.0.${{ github.run_number }}"
-          name: "BTL Protocol Release 1.0.${{ github.run_number }}"
+          name: "Sawa v1.0.${{ github.run_number }}"
+          body: |
+            ## Sawa BLE Mesh Chat — Automated Release
+
+            **Build:** `${{ github.run_number }}`
+            **Commit:** `${{ github.sha }}`
+            **Branch:** `${{ github.ref_name }}`
+
+            ### What's in this release
+            - Decentralized BLE mesh networking (no internet required)
+            - GATT operation queue with MTU negotiation + payload fragmentation
+            - Store-Carry-Forward multi-hop message relay (TTL=7)
+            - Replay attack defense via distributed packet ledger
+            - AES-256-GCM local encryption (TEE / StrongBox backed)
+            - libsodium Ed25519 + X25519 + Double Ratchet primitives (NDK)
           draft: false
           prerelease: false
         env:

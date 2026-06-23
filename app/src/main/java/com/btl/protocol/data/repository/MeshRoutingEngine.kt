@@ -1,17 +1,20 @@
 package com.btl.protocol.data.repository
 
 import android.content.Context
-import androidx.room.Dao
-import androidx.room.Database
-import androidx.room.Entity
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.PrimaryKey
-import androidx.room.Query
-import androidx.room.Room
-import androidx.room.RoomDatabase
-import com.btl.protocol.domain.model.BtlPacket
+import androidx.room.*
 import kotlinx.coroutines.flow.Flow
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Message status constants
+// ══════════════════════════════════════════════════════════════════════════════
+
+const val STATUS_PENDING = 0    // Inserted locally, not yet transmitted
+const val STATUS_SENT = 1       // GATT write acknowledged by peer
+const val STATUS_DELIVERED = 2  // Message confirmed received (for future ACK protocol)
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Room Entities
+// ══════════════════════════════════════════════════════════════════════════════
 
 @Entity(tableName = "packet_ledger")
 data class PacketLedgerEntity(
@@ -20,21 +23,10 @@ data class PacketLedgerEntity(
     val sequenceNumber: Int,
     val expiryTimestamp: Long,
     val payloadBlob: ByteArray
-)
-
-@Dao
-interface PacketLedgerDao {
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertPacket(packet: PacketLedgerEntity): Long
-
-    @Query("SELECT * FROM packet_ledger WHERE expiryTimestamp > :currentTime")
-    fun getActivePackets(currentTime: Long): Flow<List<PacketLedgerEntity>>
-
-    @Query("DELETE FROM packet_ledger WHERE expiryTimestamp <= :currentTime")
-    suspend fun pruneExpiredPackets(currentTime: Long)
-    
-    @Query("SELECT COUNT(*) FROM packet_ledger WHERE senderHash = :senderHash AND sequenceNumber = :sequenceNumber")
-    suspend fun isPacketReplayed(senderHash: String, sequenceNumber: Int): Int
+) {
+    override fun equals(other: Any?): Boolean =
+        other is PacketLedgerEntity && packetId == other.packetId
+    override fun hashCode(): Int = packetId.hashCode()
 }
 
 @Entity(tableName = "messages")
@@ -43,13 +35,38 @@ data class Message(
     val isMe: Boolean,
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val status: Int = 0
+    val status: Int = STATUS_PENDING
 )
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DAOs
+// ══════════════════════════════════════════════════════════════════════════════
+
+@Dao
+interface PacketLedgerDao {
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPacket(packet: PacketLedgerEntity): Long
+
+    @Query("SELECT * FROM packet_ledger WHERE expiryTimestamp > :now")
+    fun getActivePackets(now: Long): Flow<List<PacketLedgerEntity>>
+
+    @Query("DELETE FROM packet_ledger WHERE expiryTimestamp <= :now")
+    suspend fun pruneExpiredPackets(now: Long)
+
+    @Query(
+        "SELECT COUNT(*) FROM packet_ledger " +
+        "WHERE senderHash = :senderHash AND sequenceNumber = :seq"
+    )
+    suspend fun isPacketReplayed(senderHash: String, seq: Int): Int
+}
 
 @Dao
 interface MessageDao {
+
+    /** Returns the rowId of the inserted row — use as a stable ID for status updates. */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMessage(message: Message)
+    suspend fun insertMessage(message: Message): Long
 
     @Query("SELECT * FROM messages ORDER BY timestamp ASC")
     fun getMessages(): Flow<List<Message>>
@@ -58,63 +75,74 @@ interface MessageDao {
     suspend fun updateStatus(id: Int, status: Int)
 }
 
-@Database(entities = [PacketLedgerEntity::class, Message::class], version = 3, exportSchema = false)
+// ══════════════════════════════════════════════════════════════════════════════
+// Database
+// ══════════════════════════════════════════════════════════════════════════════
+
+@Database(
+    entities = [PacketLedgerEntity::class, Message::class],
+    version = 4,
+    exportSchema = false
+)
 abstract class MeshDatabase : RoomDatabase() {
     abstract fun packetLedgerDao(): PacketLedgerDao
     abstract fun messageDao(): MessageDao
 }
 
-class MeshRoutingEngine(context: Context) {
+// ══════════════════════════════════════════════════════════════════════════════
+// Routing Engine — Replay Defense & Ledger Tracking
+// ══════════════════════════════════════════════════════════════════════════════
 
-    private val db = Room.databaseBuilder(
-        context.applicationContext,
-        MeshDatabase::class.java,
-        "btl_mesh_ledger.db"
-    ).build()
+/**
+ * Stateless-ish validation layer. Does NOT manage its own database instance;
+ * it receives the [PacketLedgerDao] from Hilt injection to avoid the
+ * double-instantiation bug present in the original codebase.
+ *
+ * Responsibilities:
+ * - Replay attack defense (deduplication by sender+sequence)
+ * - TTL hop-count enforcement
+ * - Ledger recording for Store-Carry-Forward relay
+ */
+class MeshRoutingEngine(private val packetLedgerDao: PacketLedgerDao) {
 
-    private val dao = db.packetLedgerDao()
-
-    suspend fun processIncomingPacket(packet: BtlPacket): Boolean {
-        val senderHex = packet.senderHash.joinToString("") { "%02x".format(it) }
-        
-        // 1. Strict defense against Replay Attacks
-        val replayCount = dao.isPacketReplayed(senderHex, packet.sequenceNumber)
-        if (replayCount > 0) {
-            return false // Drop packet, already seen
+    /**
+     * Validates and records an incoming packet.
+     *
+     * @return `true`  — packet is new, valid, and should be delivered + forwarded.
+     * @return `false` — packet should be silently dropped (replay / expired TTL / duplicate).
+     */
+    suspend fun processIncomingPacket(
+        senderHex: String,
+        sequenceNumber: Int,
+        ttl: Byte,
+        payloadBlob: ByteArray
+    ): Boolean {
+        // 1. Replay attack defense — drop if we've seen this sender+seq before
+        if (packetLedgerDao.isPacketReplayed(senderHex, sequenceNumber) > 0) {
+            return false
         }
 
-        // 2. TTL Routing Check
-        if (packet.ttl <= 0) {
-            return false // Drop packet, hop limit reached
-        }
+        // 2. TTL hop-count check
+        if (ttl <= 0) return false
 
-        // 3. Decentralized Ledger Tracking
-        val packetId = "$senderHex-${packet.sequenceNumber}"
-        val expiryTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000) // 24 hours expiry
-        
+        // 3. Record in the distributed ledger (24-hour expiry)
+        val packetId = "$senderHex-$sequenceNumber"
+        val expiry = System.currentTimeMillis() + 24 * 60 * 60 * 1_000L
         val entity = PacketLedgerEntity(
             packetId = packetId,
             senderHash = senderHex,
-            sequenceNumber = packet.sequenceNumber,
-            expiryTimestamp = expiryTime,
-            payloadBlob = packet.serialize(ByteArray(32)) // Placeholder HMAC Key
+            sequenceNumber = sequenceNumber,
+            expiryTimestamp = expiry,
+            payloadBlob = payloadBlob
         )
-        
-        val inserted = dao.insertPacket(entity)
-        if (inserted == -1L) return false
+        val inserted = packetLedgerDao.insertPacket(entity)
 
-        // 4. Store-Carry-Forward Algorithm Trigger
-        packet.ttl = (packet.ttl - 1).toByte()
-        forwardPacketToAdjacentNodes(packet)
-        
-        return true
+        // -1L means IGNORE conflict fired — another coroutine raced us; treat as duplicate
+        return inserted != -1L
     }
 
-    private fun forwardPacketToAdjacentNodes(packet: BtlPacket) {
-        // Broadcast payload matrix offline via Wi-Fi direct queues / BLE peripheral traits
-    }
-    
+    /** Deletes expired ledger entries. Call periodically (e.g., every hour). */
     suspend fun pruneLedger() {
-        dao.pruneExpiredPackets(System.currentTimeMillis())
+        packetLedgerDao.pruneExpiredPackets(System.currentTimeMillis())
     }
 }
