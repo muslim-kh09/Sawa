@@ -74,6 +74,36 @@ fun ChatScreen(
     var showEditNameDialog by remember { mutableStateOf(false) }
     var showPeersDialog by remember { mutableStateOf(false) }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    var previousMessages by remember { mutableStateOf(allMessages) }
+
+    LaunchedEffect(allMessages) {
+        val newMsgs = allMessages - previousMessages.toSet()
+        previousMessages = allMessages
+        
+        for (msg in newMsgs) {
+            // Only alert for received messages that are NOT in the current chat
+            if (!msg.isMe && msg.conversationId != conversationId) {
+                val prefix = if (msg.conversationId == "PUBLIC") "[Global]" else "[DM]"
+                val sender = msg.senderName ?: "Someone"
+                // Shorten text if too long
+                val shortText = if (msg.text.length > 30) msg.text.take(30) + "..." else msg.text
+                
+                coroutineScope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "$prefix $sender: $shortText",
+                        actionLabel = "View",
+                        duration = SnackbarDuration.Short
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        onNavigateToDm(msg.conversationId)
+                    }
+                }
+            }
+        }
+    }
+
     // Auto-scroll to the latest message
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -85,6 +115,7 @@ fun ChatScreen(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets.systemBars,
         containerColor = ColorBackground,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = { 
             ChatTopBar(
                 peerCount = peerCount, 

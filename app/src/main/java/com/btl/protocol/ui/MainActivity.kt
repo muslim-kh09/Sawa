@@ -222,7 +222,7 @@ class MainActivity : FragmentActivity() {
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Unlock Sawa")
-            .setSubtitle("Use your fingerprint or device PIN to access your secure chats")
+            .setSubtitle("Enter your phone's lock screen password, PIN, or scan your fingerprint to continue.")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
             .build()
 
