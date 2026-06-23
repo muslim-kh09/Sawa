@@ -1,8 +1,13 @@
 <div align="center">
+  <img src="banner.png" alt="Sawa Mesh Banner" width="100%">
+  <br><br>
+  
   <img src="https://raw.githubusercontent.com/muslim-kh09/Sawa/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" width="128" alt="Sawa Logo">
   <h1>Sawa Mesh (سوا)</h1>
   <p><strong>Off-Grid, Decentralized Bluetooth Low Energy (BLE) Messenger for Android</strong></p>
   <p>Communicate securely anywhere, anytime—no internet, no cell towers, no central servers.</p>
+
+  > ⚠️ **DISCLAIMER:** This application was coded by AI. It is currently in an incomplete, experimental phase and is intended purely for testing and proof-of-concept purposes. Do not rely on it for critical communications yet.
 
   [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-blue.svg)](https://kotlinlang.org)
   [![Android API](https://img.shields.io/badge/API-24%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=24)
