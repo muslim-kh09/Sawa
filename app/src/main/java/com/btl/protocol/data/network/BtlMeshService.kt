@@ -81,11 +81,14 @@ class BtlMeshService : Service() {
 
         fun initIdentity(context: Context) {
             if (LOCAL_DEVICE_ID.isNotEmpty()) return
-            val prefs = context.getSharedPreferences("SawaIdentity", Context.MODE_PRIVATE)
+            val prefs = context.getSharedPreferences("SawaIdentityV2", Context.MODE_PRIVATE)
             var pubKeyBase64 = prefs.getString("publicKey", null)
             if (pubKeyBase64 == null) {
-                val kpg = java.security.KeyPairGenerator.getInstance(android.security.keystore.KeyProperties.KEY_ALGORITHM_EC)
-                kpg.initialize(256, java.security.SecureRandom())
+                val kpg = java.security.KeyPairGenerator.getInstance("EC")
+                val random = java.security.SecureRandom()
+                random.setSeed(java.util.UUID.randomUUID().toString().toByteArray())
+                random.setSeed(System.nanoTime())
+                kpg.initialize(256, random)
                 val kp = kpg.generateKeyPair()
                 pubKeyBase64 = android.util.Base64.encodeToString(kp.public.encoded, android.util.Base64.NO_WRAP)
                 prefs.edit().putString("publicKey", pubKeyBase64).apply()

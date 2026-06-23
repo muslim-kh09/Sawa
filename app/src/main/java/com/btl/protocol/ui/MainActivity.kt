@@ -79,7 +79,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         BtlMeshService.initIdentity(this)
-        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 
         registerReceiver(btStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
 

@@ -72,6 +72,7 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets.systemBars,
         containerColor = ColorBackground,
         topBar = { 
             ChatTopBar(
@@ -86,8 +87,7 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .consumeWindowInsets(ScaffoldDefaults.contentWindowInsets)
+                .padding(top = padding.calculateTopPadding())
                 .background(ColorBackground)
         ) {
             // ── Network status banner
@@ -406,8 +406,8 @@ private fun MessageInputBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(ColorBackground)
-            .padding(horizontal = 8.dp, vertical = 8.dp)
-            .imePadding(),
+            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.Bottom
     ) {
         // Text field
