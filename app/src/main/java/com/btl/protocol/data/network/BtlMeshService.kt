@@ -212,7 +212,9 @@ class BtlMeshService : Service() {
     private lateinit var peerRegistry: PeerRegistry
     private lateinit var gattQueue: GattOperationQueue
     private var gattServer: BluetoothGattServer? = null
-    private val seqNum = AtomicInteger(0)
+    // Use Unix timestamp as the initial sequence number to prevent replay-attack 
+    // drops by peers after the app is restarted.
+    private val seqNum = AtomicInteger((System.currentTimeMillis() / 1000).toInt())
 
     // ──────────────────────────────────────────────────────────────────────────
     // Lifecycle
