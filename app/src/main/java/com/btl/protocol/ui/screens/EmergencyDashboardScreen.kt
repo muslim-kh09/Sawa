@@ -1,31 +1,15 @@
 package com.btl.protocol.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,113 +19,100 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.btl.protocol.data.network.BtlMeshService
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EmergencyDashboardScreen() {
     val connectedPeers by BtlMeshService.connectedPeers.collectAsState()
+    var messageText by remember { mutableStateOf("") }
+    val messages = remember { mutableStateListOf(
+        Pair("system", "Channel encrypted (X25519) & verified (Ed25519)"),
+    ) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF121212))
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "BTL MESH PROTOCOL",
-            color = Color.White,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // SOS Broadcast Panel
-        Button(
-            onClick = { /* Trigger Geocast SOS */ },
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Sawa", color = Color.White, fontWeight = FontWeight.Bold) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF075E54)),
+                actions = {
+                    IconButton(onClick = {
+                        messages.add(Pair("me", "[SOS] I need help!"))
+                    }) {
+                        Icon(imageVector = Icons.Default.Warning, contentDescription = "SOS", tint = Color.Red)
+                    }
+                }
+            )
+        },
+        containerColor = Color(0xFFECE5DD)
+    ) { paddingValues ->
+        Column(
             modifier = Modifier
-                .size(200.dp)
-                .clip(CircleShape),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                .fillMaxSize()
+                .padding(paddingValues)
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = "SOS",
-                    tint = Color.White,
-                    modifier = Modifier.size(64.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "BROADCAST SOS", color = Color.White, fontWeight = FontWeight.Black)
+            if (connectedPeers.isEmpty()) {
+                Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF128C7E)).padding(4.dp), contentAlignment = Alignment.Center) {
+                    Text("Scanning for peers...", color = Color.White, fontSize = 12.sp)
+                }
+            } else {
+                Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF25D366)).padding(4.dp), contentAlignment = Alignment.Center) {
+                    Text("${connectedPeers.size} active mesh peers connected", color = Color.White, fontSize = 12.sp)
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(32.dp))
+            LazyColumn(
+                modifier = Modifier.weight(1f).padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(messages.size) { index ->
+                    val msg = messages[index]
+                    val isMe = msg.first == "me"
+                    val isSystem = msg.first == "system"
 
-        // Local Mesh Topology Tracker
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = "ACTIVE MESH PEERS", color = Color.Gray, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                if (connectedPeers.isEmpty()) {
-                    Text(text = "Scanning for offline nodes...", color = Color.DarkGray)
-                } else {
-                    LazyColumn {
-                        items(connectedPeers.size) { index ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(0xFF4CAF50))
-                                    )
-                                    Text(
-                                        text = connectedPeers[index].take(8) + "...",
-                                        color = Color.White,
-                                        modifier = Modifier.padding(start = 12.dp)
-                                    )
-                                }
-                                Text(text = "Direct Hop", color = Color.Cyan, fontSize = 12.sp)
-                            }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = if (isSystem) Arrangement.Center else if (isMe) Arrangement.End else Arrangement.Start
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSystem) Color(0xFFFFF59D) else if (isMe) Color(0xFFDCF8C6) else Color.White)
+                                .padding(12.dp)
+                                .widthIn(max = 280.dp)
+                        ) {
+                            Text(text = msg.second, color = Color.Black, fontSize = 14.sp)
                         }
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Secure Chat Interface Snippet
-        Card(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(text = "SECURE LOG", color = Color.Gray, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Verified",
-                        tint = Color(0xFF4CAF50),
-                        modifier = Modifier.size(16.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextField(
+                    value = messageText,
+                    onValueChange = { messageText = it },
+                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(24.dp)),
+                    placeholder = { Text("Message") },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
                     )
-                    Text(
-                        text = " Channel encrypted (X25519) & verified (Ed25519)",
-                        color = Color.Green,
-                        fontSize = 12.sp
-                    )
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                FloatingActionButton(
+                    onClick = {
+                        if (messageText.isNotBlank()) {
+                            messages.add(Pair("me", messageText))
+                            messageText = ""
+                        }
+                    },
+                    containerColor = Color(0xFF128C7E),
+                    shape = CircleShape
+                ) {
+                    Icon(imageVector = Icons.Default.Send, contentDescription = "Send", tint = Color.White)
                 }
             }
         }

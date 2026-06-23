@@ -72,7 +72,7 @@ class BtlMeshService : Service() {
 
     private fun buildNotification(): Notification {
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("BTL Mesh Network")
+            .setContentTitle("Sawa Mesh is active")
             .setContentText("Actively routing offline packets...")
             .setOngoing(true)
             .build()
@@ -83,7 +83,7 @@ class BtlMeshService : Service() {
         val advertiser = bluetoothAdapter.bluetoothLeAdvertiser
 
         val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
             
         val filter = ScanFilter.Builder()
@@ -97,7 +97,8 @@ class BtlMeshService : Service() {
         }
 
         val advSettings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_POWER)
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .setConnectable(true)
             .setTimeout(0)
             .build()
