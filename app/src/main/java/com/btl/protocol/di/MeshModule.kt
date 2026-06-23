@@ -55,10 +55,16 @@ object MeshModule {
 
     @Provides
     @Singleton
+    fun provideSessionKeyDao(db: MeshDatabase): com.btl.protocol.data.repository.SessionKeyDao =
+        db.sessionKeyDao()
+
+    @Provides
+    @Singleton
     fun provideMeshRepository(
         messageDao: MessageDao,
-        packetLedgerDao: PacketLedgerDao
-    ): MeshRepository = MeshRepository(messageDao, packetLedgerDao)
+        packetLedgerDao: PacketLedgerDao,
+        sessionKeyDao: com.btl.protocol.data.repository.SessionKeyDao
+    ): MeshRepository = MeshRepository(messageDao, packetLedgerDao, sessionKeyDao)
 
     @Provides
     @Singleton

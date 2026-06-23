@@ -53,10 +53,9 @@ class IdentityManager @Inject constructor(
         val wrappedX25519 = keyStoreWrapper.wrapKey(x25519Private)
 
         // Ed25519
-        val ed25519PrivateSeed = ByteArray(32).apply { SecureRandom().nextBytes(this) }
-        val edSigner = Ed25519Sign(ed25519PrivateSeed)
-        val ed25519PrivateKey = ed25519PrivateSeed
-        ed25519PublicKey = edSigner.publicKey
+        val keyPair = Ed25519Sign.KeyPair.newKeyPair()
+        val ed25519PrivateKey = keyPair.privateKey
+        ed25519PublicKey = keyPair.publicKey
         val wrappedEd25519 = keyStoreWrapper.wrapKey(ed25519PrivateKey)
 
         prefs.edit().apply {
