@@ -96,10 +96,13 @@ class GattOperationQueue(
 
             fun settle(success: Boolean) {
                 if (settled.compareAndSet(false, true)) {
-                    try { 
-                        gattRef?.disconnect()
-                        gattRef?.close() // INSTANT CLOSURE to prevent GATT leaks
-                    } catch (_: SecurityException) {}
+                    scope.launch {
+                        delay(200) // Cooperative delay allows BLE callbacks to fire before disconnect
+                        try { 
+                            gattRef?.disconnect()
+                            gattRef?.close() // INSTANT CLOSURE to prevent GATT leaks
+                        } catch (_: SecurityException) {}
+                    }
                     if (cont.isActive) cont.resume(success)
                 }
             }
@@ -115,11 +118,13 @@ class GattOperationQueue(
                         gatt.writeCharacteristic(
                             char,
                             data,
-                            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                            BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
                         ) == android.bluetooth.BluetoothStatusCodes.SUCCESS
                     } else {
                         @Suppress("DEPRECATION")
                         char.value = data
+                        @Suppress("DEPRECATION")
+                        char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
                         @Suppress("DEPRECATION")
                         gatt.writeCharacteristic(char)
                     }

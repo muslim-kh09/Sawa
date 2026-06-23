@@ -22,16 +22,6 @@ private val SawaColorScheme = darkColorScheme(
 
 @Composable
 fun SawaTheme(content: @Composable () -> Unit) {
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = android.graphics.Color.TRANSPARENT
-            window.navigationBarColor = android.graphics.Color.TRANSPARENT
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
-        }
-    }
     MaterialTheme(
         colorScheme = SawaColorScheme,
         content = content

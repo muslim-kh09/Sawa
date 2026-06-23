@@ -75,9 +75,27 @@ class BtlMeshService : Service() {
         private const val BROADCAST_TTL: Byte = 7
 
         /** Unique identifier for this device instance to prevent self-echoes. */
-        val LOCAL_DEVICE_ID = java.util.UUID.randomUUID().toString()
-        val NODE_ID_BYTES = LOCAL_DEVICE_ID.toByteArray(Charsets.UTF_8).take(8).toByteArray()
-        val NODE_ID_STRING = String(NODE_ID_BYTES, Charsets.UTF_8)
+        var LOCAL_DEVICE_ID = ""
+        var NODE_ID_BYTES = ByteArray(8)
+        var NODE_ID_STRING = ""
+
+        fun initIdentity(context: Context) {
+            if (LOCAL_DEVICE_ID.isNotEmpty()) return
+            val prefs = context.getSharedPreferences("SawaIdentity", Context.MODE_PRIVATE)
+            var pubKeyBase64 = prefs.getString("publicKey", null)
+            if (pubKeyBase64 == null) {
+                val kpg = java.security.KeyPairGenerator.getInstance(android.security.keystore.KeyProperties.KEY_ALGORITHM_EC)
+                kpg.initialize(256)
+                val kp = kpg.generateKeyPair()
+                pubKeyBase64 = android.util.Base64.encodeToString(kp.public.encoded, android.util.Base64.NO_WRAP)
+                prefs.edit().putString("publicKey", pubKeyBase64).apply()
+            }
+            val digest = MessageDigest.getInstance("SHA-256")
+            val hash = digest.digest(pubKeyBase64!!.toByteArray(Charsets.UTF_8))
+            LOCAL_DEVICE_ID = hash.joinToString("") { "%02x".format(it) }.take(16)
+            NODE_ID_BYTES = LOCAL_DEVICE_ID.toByteArray(Charsets.UTF_8).take(8).toByteArray()
+            NODE_ID_STRING = String(NODE_ID_BYTES, Charsets.UTF_8)
+        }
 
         /** Tracks seen message UUIDs to deduplicate echoes from the broadcast mesh. */
         val processedMessageIds = mutableSetOf<String>()
@@ -195,6 +213,7 @@ class BtlMeshService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        initIdentity(this)
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
 
@@ -270,11 +289,11 @@ class BtlMeshService : Service() {
                 MESH_SERVICE_UUID,
                 BluetoothGattService.SERVICE_TYPE_PRIMARY
             )
-            // PROPERTY_WRITE = acknowledged write (reliable delivery, fixes WRITE_NO_RESPONSE bug)
+            // PROPERTY_WRITE_NO_RESPONSE (reliable delivery, fixes WRITE_NO_RESPONSE bug logic using delayed settle)
             // PROPERTY_INDICATE = server-initiated confirmed notifications (future use)
             val characteristic = BluetoothGattCharacteristic(
                 CHAR_UUID,
-                BluetoothGattCharacteristic.PROPERTY_WRITE or
+                BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE or
                 BluetoothGattCharacteristic.PROPERTY_INDICATE,
                 BluetoothGattCharacteristic.PERMISSION_WRITE
             )
