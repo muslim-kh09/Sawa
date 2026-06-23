@@ -305,7 +305,7 @@ class BtlMeshService : Service() {
 
     /**
      * Full inbound pipeline:
-     * 1. Parse raw bytes as a Sawa wire packet  [senderHex | seq | ttl | text]
+     * 1. Parse raw bytes as a Sawa wire packet  (senderHex | seq | ttl | text)
      * 2. Replay-attack defense via [MeshRoutingEngine]
      * 3. Deliver decoded text to Room DB (UI observes via Flow)
      * 4. Re-broadcast to all other peers (Store-Carry-Forward relay)
@@ -431,7 +431,7 @@ class BtlMeshService : Service() {
     /**
      * Builds the raw wire payload for a text message.
      *
-     * Format: [senderHex: 64 bytes] [seq: 4 bytes BE] [ttl: 1 byte] [utf8Text...]
+     * Format: (senderHex: 64 bytes) (seq: 4 bytes BE) (ttl: 1 byte) (utf8Text...)
      */
     fun buildOutgoingPayload(text: String): ByteArray {
         val seq = seqNum.getAndIncrement()
