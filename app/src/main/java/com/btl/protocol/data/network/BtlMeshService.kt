@@ -118,15 +118,23 @@ class BtlMeshService : Service() {
         private val _meshActive = MutableStateFlow(false)
         val meshActive: StateFlow<Boolean> = _meshActive.asStateFlow()
 
-        data class PeerIdentity(val fullId: String, val displayName: String)
+        data class PeerIdentity(val fullId: String, val displayName: String, val pubKey: ByteArray? = null)
         private val _knownIdentities = MutableStateFlow<Map<String, PeerIdentity>>(emptyMap())
         val knownIdentities: StateFlow<Map<String, PeerIdentity>> = _knownIdentities.asStateFlow()
 
-        fun updateIdentity(sId: String, dName: String) {
+        fun updateIdentity(sId: String, dName: String, pubKeyB64: String? = null) {
             val nodeId = sId.take(8)
             val current = _knownIdentities.value
-            if (current[nodeId]?.displayName != dName) {
-                _knownIdentities.value = current + (nodeId to PeerIdentity(sId, dName))
+            val existing = current[nodeId]
+            
+            val pubKeyBytes = try {
+                pubKeyB64?.let { android.util.Base64.decode(it, android.util.Base64.NO_WRAP) }
+            } catch (e: Exception) { null }
+            
+            val newPubKey = pubKeyBytes ?: existing?.pubKey
+            
+            if (existing?.displayName != dName || (pubKeyBytes != null && existing?.pubKey == null)) {
+                _knownIdentities.value = current + (nodeId to PeerIdentity(sId, dName, newPubKey))
             }
         }
 
@@ -147,10 +155,21 @@ class BtlMeshService : Service() {
          */
         fun buildPayloadStatic(text: String, msgId: String = java.util.UUID.randomUUID().toString(), conversationId: String = "PUBLIC"): ByteArray? {
             processedMessageIds.add(msgId)
-            // If it's a DM, we embed the target inside the text using a prefix that old devices will render cleanly,
-            // or we handle it in the application layer. For now, we revert to 4 parts to restore global chat.
-            val finalText = if (conversationId != "PUBLIC") "[$conversationId] $text" else text
-            val newText = "$msgId|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$finalText"
+            
+            val finalString = if (conversationId != "PUBLIC") {
+                val recipientNodeId = conversationId.take(8)
+                val recipientPubKey = _knownIdentities.value[recipientNodeId]?.pubKey
+                if (recipientPubKey != null) {
+                    val encrypted = liveService?.identityManager?.encryptMessage(recipientPubKey, text)
+                    if (encrypted != null) "[$conversationId] E2E:$encrypted" else "[$conversationId] $text"
+                } else {
+                    "[$conversationId] $text" // Fallback if key unknown
+                }
+            } else {
+                text
+            }
+            
+            val newText = "$msgId|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$finalString"
             return liveService?.buildOutgoingPayload(newText)
         } 
 
@@ -267,7 +286,8 @@ class BtlMeshService : Service() {
                 if (_meshActive.value) {
                     val allIds = meshRepository.getAllMessageIds()
                     val recentIds = if (allIds.isNotEmpty()) allIds.takeLast(20) else emptyList()
-                    val syncPayload = "SYNC|${recentIds.joinToString(",")}|$LOCAL_DEVICE_ID|$DISPLAY_NAME"
+                    val myPubKeyB64 = android.util.Base64.encodeToString(identityManager.x25519PublicKey, android.util.Base64.NO_WRAP)
+                    val syncPayload = "SYNC|${recentIds.joinToString(",")}|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$myPubKeyB64"
                     val payload = buildOutgoingPayload(syncPayload)
                     
                     // Enqueue to all peers safely
@@ -428,7 +448,8 @@ class BtlMeshService : Service() {
         if (text.startsWith("SYNC|")) {
             val parts = text.split("|")
             if (parts.size >= 4) {
-                updateIdentity(parts[2], parts[3])
+                val pubKey = if (parts.size >= 5) parts[4] else null
+                updateIdentity(parts[2], parts[3], pubKey)
             }
             val remoteIds = parts[1].split(",")
             val localIds = meshRepository.getAllMessageIds()
@@ -468,7 +489,25 @@ class BtlMeshService : Service() {
 
             if (isForMe) {
                 // It's a DM directed to me
-                val cleanedText = actualText.removePrefix(convIdPrefix)
+                var cleanedText = actualText.removePrefix(convIdPrefix)
+                
+                // Attempt E2EE Decryption
+                if (cleanedText.startsWith("E2E:")) {
+                    val encryptedB64 = cleanedText.removePrefix("E2E:")
+                    val senderNodeId = sId.take(8)
+                    val senderPubKey = _knownIdentities.value[senderNodeId]?.pubKey
+                    if (senderPubKey != null) {
+                        val decrypted = identityManager.decryptMessage(senderPubKey, encryptedB64)
+                        if (decrypted != null) {
+                            cleanedText = decrypted
+                        } else {
+                            cleanedText = "🔒 [Encrypted message could not be decrypted]"
+                        }
+                    } else {
+                        cleanedText = "🔒 [Encrypted message received, but sender's public key is unknown]"
+                    }
+                }
+                
                 meshRepository.addMessage(
                     Message(messageId = msgId, isMe = false, text = cleanedText, status = STATUS_DELIVERED, senderName = dName, conversationId = sId)
                 )

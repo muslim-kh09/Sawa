@@ -82,4 +82,35 @@ class IdentityManager @Inject constructor(
         val hash = digest.digest(x25519PublicKey)
         return hash.joinToString("") { "%02x".format(it) }
     }
+
+    fun encryptMessage(targetPubKey: ByteArray, plaintext: String): String? {
+        try {
+            val myPriv = getX25519PrivateKey()
+            val sharedSecret = X25519.computeSharedSecret(myPriv, targetPubKey)
+            val digest = MessageDigest.getInstance("SHA-256")
+            val keyBytes = digest.digest(sharedSecret) // 32 bytes AES key
+            val cipher = com.google.crypto.tink.subtle.AesGcmJce(keyBytes)
+            val ciphertext = cipher.encrypt(plaintext.toByteArray(Charsets.UTF_8), ByteArray(0))
+            return Base64.encodeToString(ciphertext, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
+
+    fun decryptMessage(senderPubKey: ByteArray, ciphertextB64: String): String? {
+        try {
+            val myPriv = getX25519PrivateKey()
+            val sharedSecret = X25519.computeSharedSecret(myPriv, senderPubKey)
+            val digest = MessageDigest.getInstance("SHA-256")
+            val keyBytes = digest.digest(sharedSecret)
+            val cipher = com.google.crypto.tink.subtle.AesGcmJce(keyBytes)
+            val ciphertext = Base64.decode(ciphertextB64, Base64.NO_WRAP)
+            val plaintextBytes = cipher.decrypt(ciphertext, ByteArray(0))
+            return String(plaintextBytes, Charsets.UTF_8)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
 }
