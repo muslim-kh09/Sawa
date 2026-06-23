@@ -21,6 +21,8 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────────
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # ─────────────────────────────────────────────────────────────────────────
       # 2. Java + Gradle (wrapper-based — avoids "gradle not found" on PATH)
@@ -98,11 +100,19 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────────
       # 9. Extract Version for Artifact and Release
       # ─────────────────────────────────────────────────────────────────────────
-      - name: Extract Version
+      - name: Calculate Automatic Version
         id: ext_version
         run: |
-          VERSION_NAME=$(grep -E 'versionName\s*=\s*".*"' app/build.gradle.kts | awk -F '"' '{print $2}')
-          echo "version=$VERSION_NAME" >> $GITHUB_OUTPUT
+          # Ensure tags are fetched
+          git fetch --tags origin || true
+          
+          # Count commits since the v1.0.0 tag we just created
+          COMMIT_COUNT=$(git rev-list v1.0.0..HEAD --count 2>/dev/null || echo "0")
+          
+          # Our automatic version is 1.0.X
+          AUTO_VERSION="1.0.$COMMIT_COUNT"
+          echo "version=$AUTO_VERSION" >> $GITHUB_OUTPUT
+          echo "Calculated Automatic Version: $AUTO_VERSION"
 
       # ─────────────────────────────────────────────────────────────────────────
       # 10. Upload APK as workflow artifact (all runs)
