@@ -4,8 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
+import android.bluetooth.*
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
@@ -26,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class BtlMeshService : Service() {
 
@@ -33,26 +33,40 @@ class BtlMeshService : Service() {
         private const val NOTIFICATION_ID = 42
         private const val CHANNEL_ID = "BTL_MESH_SERVICE_CHANNEL"
         val MESH_SERVICE_UUID: UUID = UUID.fromString("0000B71C-0000-1000-8000-00805f9b34fb")
+        val CHAR_UUID: UUID = UUID.fromString("0000B71D-0000-1000-8000-00805f9b34fb")
+        val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         
         private val _connectedPeers = MutableStateFlow<Set<String>>(emptySet())
         val connectedPeers: StateFlow<Set<String>> = _connectedPeers.asStateFlow()
         
+        var instance: BtlMeshService? = null
+
         fun transmitGatt(text: String) {
             Log.d("BtlMeshService", "Transmitting encrypted byte array via GATT to nodes: $text")
+            instance?.transmit(text.toByteArray(Charsets.UTF_8))
         }
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private lateinit var bluetoothManager: BluetoothManager
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var wifiP2pManager: WifiP2pManager
     private lateinit var wifiP2pChannel: WifiP2pManager.Channel
 
+    private var gattServer: BluetoothGattServer? = null
+
+    // Track connected devices
+    private val connectedClientGatts = ConcurrentHashMap<String, BluetoothGatt>()
+    private val connectedServerClients = ConcurrentHashMap<String, BluetoothDevice>()
+    private val deviceMtuMap = ConcurrentHashMap<String, Int>()
+
     override fun onCreate() {
         super.onCreate()
+        instance = this
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
 
-        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
         
         wifiP2pManager = getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
@@ -63,6 +77,13 @@ class BtlMeshService : Service() {
         startBleMesh()
         startWifiDirectDiscovery()
         return START_STICKY
+    }
+
+    private fun updateConnectedPeers() {
+        val peers = mutableSetOf<String>()
+        peers.addAll(connectedClientGatts.keys)
+        peers.addAll(connectedServerClients.keys)
+        _connectedPeers.value = peers
     }
 
     private fun createNotificationChannel() {
@@ -86,11 +107,15 @@ class BtlMeshService : Service() {
     }
 
     private fun startBleMesh() {
+        if (!bluetoothAdapter.isEnabled) return
+
+        setupGattServer()
+
         val scanner = bluetoothAdapter.bluetoothLeScanner
         val advertiser = bluetoothAdapter.bluetoothLeAdvertiser
 
         if (scanner == null || advertiser == null) {
-            Log.e("BtlMeshService", "BLE Scanner or Advertiser is null, Bluetooth might be off.")
+            Log.e("BtlMeshService", "BLE Scanner or Advertiser is null.")
             return
         }
 
@@ -111,9 +136,9 @@ class BtlMeshService : Service() {
 
         try {
             scanner.startScan(listOf(filter), settings, bleScanCallback)
-            Log.d("BtlMeshService", "BLE Scanning started with UUID filter.")
+            Log.d("BtlMeshService", "BLE Scanning started.")
         } catch (e: SecurityException) {
-            Log.e("BtlMeshService", "SecurityException starting BLE scan", e)
+            Log.e("BtlMeshService", "SecurityException scanning", e)
         }
 
         val advSettings = AdvertiseSettings.Builder()
@@ -130,65 +155,208 @@ class BtlMeshService : Service() {
 
         try {
             advertiser.startAdvertising(advSettings, advData, advCallback)
-            Log.d("BtlMeshService", "BLE Advertising requested with UUID payload.")
+            Log.d("BtlMeshService", "BLE Advertising requested.")
         } catch (e: SecurityException) {
-            Log.e("BtlMeshService", "SecurityException starting BLE advertising", e)
+            Log.e("BtlMeshService", "SecurityException advertising", e)
+        }
+    }
+
+    private fun setupGattServer() {
+        try {
+            gattServer = bluetoothManager.openGattServer(this, gattServerCallback)
+            
+            val service = BluetoothGattService(MESH_SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY)
+            
+            val characteristic = BluetoothGattCharacteristic(
+                CHAR_UUID,
+                BluetoothGattCharacteristic.PROPERTY_WRITE or 
+                BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE or 
+                BluetoothGattCharacteristic.PROPERTY_NOTIFY or 
+                BluetoothGattCharacteristic.PROPERTY_INDICATE,
+                BluetoothGattCharacteristic.PERMISSION_WRITE or BluetoothGattCharacteristic.PERMISSION_READ
+            )
+
+            val cccd = BluetoothGattDescriptor(
+                CCCD_UUID,
+                BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE
+            )
+            characteristic.addDescriptor(cccd)
+            
+            service.addCharacteristic(characteristic)
+            gattServer?.addService(service)
+            Log.d("BtlMeshService", "GATT Server started.")
+        } catch (e: SecurityException) {
+            Log.e("BtlMeshService", "SecurityException openGattServer", e)
         }
     }
 
     private val bleScanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             result?.device?.let { device ->
-                val current = _connectedPeers.value.toMutableSet()
-                if (current.add(device.address)) {
-                    _connectedPeers.value = current
+                if (!connectedClientGatts.containsKey(device.address)) {
                     try {
-                        device.connectGatt(this@BtlMeshService, false, gattCallback)
+                        Log.d("BtlMeshService", "Found device, connecting GATT: ${device.address}")
+                        val gatt = device.connectGatt(this@BtlMeshService, false, gattCallback)
+                        if (gatt != null) {
+                            connectedClientGatts[device.address] = gatt
+                            updateConnectedPeers()
+                        }
                     } catch (e: SecurityException) {
-                        Log.e("BtlMeshService", "SecurityException connecting GATT", e)
+                        Log.e("BtlMeshService", "SecurityException connectGatt", e)
                     }
                 }
             }
         }
     }
 
-    private val gattCallback = object : android.bluetooth.BluetoothGattCallback() {
-        override fun onConnectionStateChange(gatt: android.bluetooth.BluetoothGatt, status: Int, newState: Int) {
-            if (newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED) {
+    private val gattCallback = object : BluetoothGattCallback() {
+        override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            val address = gatt.device.address
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.d("BtlMeshService", "GATT Client connected to: $address")
+                connectedClientGatts[address] = gatt
+                updateConnectedPeers()
                 try {
-                    gatt.requestMtu(512)
+                    // MTU Negotiation
+                    val requested = gatt.requestMtu(512)
+                    Log.d("BtlMeshService", "Requested MTU 512: $requested")
+                } catch (e: SecurityException) {}
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.d("BtlMeshService", "GATT Client disconnected from: $address")
+                connectedClientGatts.remove(address)
+                deviceMtuMap.remove(address)
+                updateConnectedPeers()
+                try {
+                    gatt.close()
                 } catch (e: SecurityException) {}
             }
         }
 
-        override fun onMtuChanged(gatt: android.bluetooth.BluetoothGatt, mtu: Int, status: Int) {
-            if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d("BtlMeshService", "MTU changed to $mtu for ${gatt.device.address}")
+                deviceMtuMap[gatt.device.address] = mtu
+                try {
+                    gatt.discoverServices()
+                } catch (e: SecurityException) {}
+            } else {
+                Log.e("BtlMeshService", "MTU request failed, falling back to 20")
+                deviceMtuMap[gatt.device.address] = 23 // Default MTU
                 try {
                     gatt.discoverServices()
                 } catch (e: SecurityException) {}
             }
         }
         
-        override fun onServicesDiscovered(gatt: android.bluetooth.BluetoothGatt, status: Int) {
-            if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
+        override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
                 val service = gatt.getService(MESH_SERVICE_UUID)
-                val char = service?.getCharacteristic(UUID.fromString("0000B71D-0000-1000-8000-00805f9b34fb"))
+                val char = service?.getCharacteristic(CHAR_UUID)
                 if (char != null) {
                     try {
                         gatt.setCharacteristicNotification(char, true)
-                        val descriptor = char.getDescriptor(UUID.fromString("00002902-0000-1000-8000-00805f9b34fb"))
+                        // CCCD descriptor (Critical)
+                        val descriptor = char.getDescriptor(CCCD_UUID)
                         if (descriptor != null) {
-                            descriptor.value = android.bluetooth.BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                            descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                             gatt.writeDescriptor(descriptor)
+                            Log.d("BtlMeshService", "Wrote CCCD to enable notifications")
                         }
-                    } catch (e: SecurityException) {}
+                    } catch (e: SecurityException) {
+                        Log.e("BtlMeshService", "Failed to write CCCD", e)
+                    }
                 }
             }
         }
 
-        override fun onCharacteristicWrite(gatt: android.bluetooth.BluetoothGatt, characteristic: android.bluetooth.BluetoothGattCharacteristic, status: Int) {
-            if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
-                Log.d("BtlMeshService", "Message written successfully to GATT")
+        override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d("BtlMeshService", "Message chunk written successfully to GATT")
+            }
+        }
+
+        override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
+            val data = characteristic.value
+            if (data != null) {
+                Log.d("BtlMeshService", "Received data via Client notification: ${data.size} bytes")
+                // In a real app we'd pass this up to the app logic
+            }
+        }
+    }
+
+    private val gattServerCallback = object : BluetoothGattServerCallback() {
+        override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
+            val address = device.address
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                Log.d("BtlMeshService", "GATT Server client connected: $address")
+                connectedServerClients[address] = device
+                updateConnectedPeers()
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.d("BtlMeshService", "GATT Server client disconnected: $address")
+                connectedServerClients.remove(address)
+                deviceMtuMap.remove(address)
+                updateConnectedPeers()
+            }
+        }
+
+        override fun onMtuChanged(device: BluetoothDevice, mtu: Int) {
+            Log.d("BtlMeshService", "Server MTU changed to $mtu for ${device.address}")
+            deviceMtuMap[device.address] = mtu
+        }
+
+        override fun onCharacteristicWriteRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            characteristic: BluetoothGattCharacteristic,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray?
+        ) {
+            if (characteristic.uuid == CHAR_UUID) {
+                try {
+                    if (responseNeeded) {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null)
+                    }
+                    if (value != null) {
+                        Log.d("BtlMeshService", "Received data via Server write: ${value.size} bytes")
+                        // In a real app we'd pass this up to the app logic
+                    }
+                } catch (e: SecurityException) {
+                    Log.e("BtlMeshService", "Failed to send write response", e)
+                }
+            } else {
+                try {
+                    if (responseNeeded) {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
+                    }
+                } catch (e: SecurityException) {}
+            }
+        }
+
+        override fun onDescriptorWriteRequest(
+            device: BluetoothDevice,
+            requestId: Int,
+            descriptor: BluetoothGattDescriptor,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray?
+        ) {
+            if (descriptor.uuid == CCCD_UUID) {
+                val isNotifying = value?.contentEquals(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == true
+                Log.d("BtlMeshService", "CCCD write request for ${device.address}, enabling notifications: $isNotifying")
+                try {
+                    if (responseNeeded) {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, offset, null)
+                    }
+                } catch (e: SecurityException) {}
+            } else {
+                try {
+                    if (responseNeeded) {
+                        gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, offset, null)
+                    }
+                } catch (e: SecurityException) {}
             }
         }
     }
@@ -200,6 +368,51 @@ class BtlMeshService : Service() {
 
         override fun onStartFailure(errorCode: Int) {
             Log.e("BtlMeshService", "BLE Advertising failed: $errorCode")
+        }
+    }
+
+    private fun transmit(payload: ByteArray) {
+        // Payload Chunking (Fallback)
+        // If MTU fails, fallback to 20 bytes payload (MTU 23 - 3 bytes overhead)
+        
+        // Send via Server to connected Clients (Notify)
+        for ((address, device) in connectedServerClients) {
+            val mtu = deviceMtuMap[address] ?: 23
+            val chunkSize = (mtu - 3).coerceAtLeast(20)
+            val chunks = payload.toList().chunked(chunkSize)
+            
+            val char = gattServer?.getService(MESH_SERVICE_UUID)?.getCharacteristic(CHAR_UUID)
+            if (char != null) {
+                for (chunk in chunks) {
+                    char.value = chunk.toByteArray()
+                    try {
+                        gattServer?.notifyCharacteristicChanged(device, char, false)
+                        Log.d("BtlMeshService", "Sent chunk of ${chunk.size} via Server Notify to $address")
+                    } catch (e: SecurityException) {
+                        Log.e("BtlMeshService", "Failed to notify characteristic", e)
+                    }
+                }
+            }
+        }
+
+        // Send via Client to connected Servers (Write)
+        for ((address, gatt) in connectedClientGatts) {
+            val mtu = deviceMtuMap[address] ?: 23
+            val chunkSize = (mtu - 3).coerceAtLeast(20)
+            val chunks = payload.toList().chunked(chunkSize)
+            
+            val char = gatt.getService(MESH_SERVICE_UUID)?.getCharacteristic(CHAR_UUID)
+            if (char != null) {
+                for (chunk in chunks) {
+                    char.value = chunk.toByteArray()
+                    try {
+                        gatt.writeCharacteristic(char)
+                        Log.d("BtlMeshService", "Sent chunk of ${chunk.size} via Client Write to $address")
+                    } catch (e: SecurityException) {
+                        Log.e("BtlMeshService", "Failed to write characteristic", e)
+                    }
+                }
+            }
         }
     }
 
@@ -222,9 +435,18 @@ class BtlMeshService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        instance = null
         try {
             bluetoothAdapter.bluetoothLeScanner?.stopScan(bleScanCallback)
             bluetoothAdapter.bluetoothLeAdvertiser?.stopAdvertising(advCallback)
+            
+            for (gatt in connectedClientGatts.values) {
+                gatt.close()
+            }
+            connectedClientGatts.clear()
+            
+            gattServer?.close()
+            gattServer = null
         } catch (e: SecurityException) {
             Log.e("BtlMeshService", "SecurityException stopping BLE", e)
         }
