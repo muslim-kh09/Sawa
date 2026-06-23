@@ -99,7 +99,7 @@ class MeshViewModel @Inject constructor(
     @SuppressLint("MissingPermission")
     fun sendSos(context: Context) {
         try {
-            val client = com.google.android.gms.location.LocationServices.getFusedLocationClient(context)
+            val client = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
             client.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
                     val lat = String.format(java.util.Locale.US, "%.4f", location.latitude)
