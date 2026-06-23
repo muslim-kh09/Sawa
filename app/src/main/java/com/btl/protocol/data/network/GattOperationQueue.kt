@@ -96,7 +96,10 @@ class GattOperationQueue(
 
             fun settle(success: Boolean) {
                 if (settled.compareAndSet(false, true)) {
-                    try { gattRef?.disconnect() } catch (_: SecurityException) {}
+                    try { 
+                        gattRef?.disconnect()
+                        gattRef?.close() // INSTANT CLOSURE to prevent GATT leaks
+                    } catch (_: SecurityException) {}
                     if (cont.isActive) cont.resume(success)
                 }
             }

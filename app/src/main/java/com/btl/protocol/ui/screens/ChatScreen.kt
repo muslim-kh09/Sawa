@@ -72,7 +72,14 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
     Scaffold(
         modifier = Modifier.imePadding().systemBarsPadding(),
         containerColor = ColorBackground,
-        topBar = { ChatTopBar(peerCount = peerCount, meshActive = meshActive, onSosClick = { viewModel.sendSos(context) }) },
+        topBar = { 
+            ChatTopBar(
+                peerCount = peerCount, 
+                meshActive = meshActive, 
+                onSosClick = { viewModel.sendSos(context) },
+                onPanicClick = { viewModel.panicWipe() }
+            ) 
+        },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -133,12 +140,14 @@ fun ChatScreen(viewModel: MeshViewModel = hiltViewModel()) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ChatTopBar(peerCount: Int, meshActive: Boolean, onSosClick: () -> Unit) {
+private fun ChatTopBar(peerCount: Int, meshActive: Boolean, onSosClick: () -> Unit, onPanicClick: () -> Unit) {
+    var tapTimes by remember { mutableStateOf(listOf<Long>()) }
+
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = ColorHeader),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Avatar
+                // Avatar (Panic Mode trigger)
                 Box(
                     modifier = Modifier
                         .size(38.dp)
@@ -147,7 +156,16 @@ private fun ChatTopBar(peerCount: Int, meshActive: Boolean, onSosClick: () -> Un
                             brush = Brush.radialGradient(
                                 colors = listOf(ColorHeaderLight, ColorHeader)
                             )
-                        ),
+                        )
+                        .clickable {
+                            val now = System.currentTimeMillis()
+                            val recentTaps = tapTimes.filter { now - it < 1000 } + now
+                            tapTimes = recentTaps
+                            if (recentTaps.size >= 3) {
+                                onPanicClick()
+                                tapTimes = emptyList()
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(

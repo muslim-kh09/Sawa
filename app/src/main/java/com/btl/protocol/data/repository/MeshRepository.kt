@@ -55,4 +55,10 @@ class MeshRepository @Inject constructor(
     suspend fun pruneExpired() {
         packetLedgerDao.pruneExpiredPackets(System.currentTimeMillis())
     }
+
+    /** PANIC MODE: Instantly purges all messages and packet history from the database. */
+    suspend fun purgeDatabase() {
+        messageDao.deleteAllMessages()
+        packetLedgerDao.deleteAllPackets()
+    }
 }

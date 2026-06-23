@@ -111,8 +111,20 @@ class MeshViewModel @Inject constructor(
             }.addOnFailureListener {
                 sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
             }
-        } catch (e: Exception) {
+        } catch (t: Throwable) {
             sendMessage("[🆘 SOS] I need immediate help! Location unknown. Please relay.")
+        }
+    }
+
+    /**
+     * PANIC MODE (وضع الذعر)
+     * Clears local database and in-memory cryptographic states.
+     */
+    fun panicWipe() {
+        viewModelScope.launch {
+            repository.purgeDatabase()
+            BtlMeshService.panicWipe()
+            Log.e(TAG, "🚨 PANIC MODE ACTIVATED. All data wiped.")
         }
     }
 }

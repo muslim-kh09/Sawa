@@ -82,6 +82,15 @@ class BtlMeshService : Service() {
         /** Tracks seen message UUIDs to deduplicate echoes from the broadcast mesh. */
         val processedMessageIds = mutableSetOf<String>()
 
+        /** PANIC MODE: Clears all in-memory state. */
+        fun panicWipe() {
+            processedMessageIds.clear()
+            peers.value.values.forEach { 
+                try { it.device.connectGatt(null, false, null)?.close() } catch(_: Exception){} 
+            }
+            // Clear current message queue if possible (not strictly required if app restarts, but good hygiene)
+        }
+
         /** SHA-256 of "SAWA_BROADCAST_IDENTITY" — used as the senderHash for all nodes. */
         val BROADCAST_SENDER_HASH: ByteArray by lazy {
             MessageDigest.getInstance("SHA-256").digest("SAWA_BROADCAST_IDENTITY".toByteArray())
@@ -104,6 +113,12 @@ class BtlMeshService : Service() {
         @Volatile private var livePeers: PeerRegistry? = null
         @Volatile private var liveService: BtlMeshService? = null
 
+        @Volatile var lastTrafficTime = System.currentTimeMillis()
+        
+        fun markTraffic() {
+            lastTrafficTime = System.currentTimeMillis()
+        }
+
         /**
          * Builds an outgoing payload using the live service's sequence number counter.
          * Returns null if the service is not currently running.
@@ -124,6 +139,7 @@ class BtlMeshService : Service() {
          * @param onResult  Called with true on successful delivery to ≥1 peer.
          */
         fun enqueueTransmit(payload: ByteArray, messageId: Long, onResult: (Boolean) -> Unit = {}) {
+            markTraffic()
             val queue = liveQueue ?: run {
                 Log.w(TAG, "enqueueTransmit called but service is not running")
                 onResult(false)
@@ -214,6 +230,8 @@ class BtlMeshService : Service() {
             startScanning()
             startAdvertising()
             _meshActive.value = true
+            isRadioOn = true
+            startDutyCycleLoop()
             Log.i(TAG, "Mesh started.")
         } else {
             Log.w(TAG, "Bluetooth not enabled — mesh not started.")
@@ -324,6 +342,7 @@ class BtlMeshService : Service() {
      * 4. Re-broadcast to all other peers (Store-Carry-Forward relay)
      */
     private suspend fun handleIncomingPayload(senderAddress: String, payload: ByteArray) {
+        markTraffic()
         // Simple wire format for this implementation:
         // [senderHashHex: 64 ASCII chars] [seqNum: 4 bytes BE] [ttl: 1 byte] [utf8Text...]
         if (payload.size < 69) {
@@ -425,6 +444,15 @@ class BtlMeshService : Service() {
         }
     }
 
+    private fun stopScanning() {
+        try {
+            bluetoothAdapter.bluetoothLeScanner?.stopScan(scanCallback)
+            Log.i(TAG, "BLE scanning stopped.")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException stopScan", e)
+        }
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // BLE Advertising
     // ──────────────────────────────────────────────────────────────────────────
@@ -459,6 +487,61 @@ class BtlMeshService : Service() {
         }
         override fun onStartFailure(errorCode: Int) {
             Log.e(TAG, "Advertising failed: $errorCode")
+        }
+    }
+
+    private fun stopAdvertising() {
+        try {
+            bluetoothAdapter.bluetoothLeAdvertiser?.stopAdvertising(advertiseCallback)
+            Log.i(TAG, "BLE advertising stopped.")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException stopAdvertising", e)
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Adaptive Duty Cycling (Battery Saver)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private var isDutyCycling = false
+    private var isRadioOn = false
+
+    private fun startDutyCycleLoop() {
+        serviceScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(5000)
+                val hasRecentTraffic = (System.currentTimeMillis() - lastTrafficTime) < 60_000L
+                val connectedCount = peerRegistry.count()
+                val shouldDutyCycle = !hasRecentTraffic && connectedCount > 2
+
+                if (shouldDutyCycle && !isDutyCycling) {
+                    isDutyCycling = true
+                    Log.i(TAG, "Entering adaptive duty cycle mode (Battery Saver)")
+                } else if (!shouldDutyCycle && isDutyCycling) {
+                    isDutyCycling = false
+                    Log.i(TAG, "Exiting duty cycle mode (Continuous)")
+                    if (!isRadioOn) {
+                        startScanning()
+                        startAdvertising()
+                        isRadioOn = true
+                    }
+                }
+
+                if (isDutyCycling) {
+                    if (!isRadioOn) {
+                        startScanning()
+                        startAdvertising()
+                        isRadioOn = true
+                    }
+                    kotlinx.coroutines.delay(5000) // ON duration
+                    if (isDutyCycling) {
+                        stopScanning()
+                        stopAdvertising()
+                        isRadioOn = false
+                        kotlinx.coroutines.delay(15000) // OFF duration
+                    }
+                }
+            }
         }
     }
 

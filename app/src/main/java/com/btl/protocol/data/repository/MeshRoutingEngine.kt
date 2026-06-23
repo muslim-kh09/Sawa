@@ -59,6 +59,9 @@ interface PacketLedgerDao {
         "WHERE senderHash = :senderHash AND sequenceNumber = :seq"
     )
     suspend fun isPacketReplayed(senderHash: String, seq: Int): Int
+
+    @Query("DELETE FROM packet_ledger")
+    suspend fun deleteAllPackets()
 }
 
 @Dao
@@ -73,6 +76,9 @@ interface MessageDao {
 
     @Query("UPDATE messages SET status = :status WHERE id = :id")
     suspend fun updateStatus(id: Int, status: Int)
+
+    @Query("DELETE FROM messages")
+    suspend fun deleteAllMessages()
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
