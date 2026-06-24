@@ -194,7 +194,7 @@ private fun ChatTopBar(
         stringResource(R.string.direct_connection)
     } else {
         if (meshActive && peerCount > 0)
-            "$peerCount " + stringResource(R.string.peers_online)
+            stringResource(R.string.peers_online, peerCount)
         else if (meshActive) stringResource(R.string.scanning)
         else stringResource(R.string.mesh_inactive)
     }

@@ -7,18 +7,14 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * Handles fragmentation and reassembly of BLE payloads that exceed the negotiated MTU.
  *
- * ## Wire Format — 7-byte fragment header:
+ * ## Wire Format — 9-byte fragment header:
  * ```
  * ┌─────────┬──────────────┬───────────────┬───────────────┬────────────┐
  * │  Magic  │    msgId     │   fragIndex   │   fragTotal   │   data...  │
- * │ 1 byte  │   4 bytes    │    1 byte     │    1 byte     │  variable  │
- * │  0xF5   │  (Big-Endian)│  (0-indexed)  │  (max 255)   │            │
+ * │ 1 byte  │   4 bytes    │    2 bytes    │    2 bytes    │  variable  │
+ * │  0xF5   │  (Big-Endian)│  (0-indexed)  │ (max 65535)   │            │
  * └─────────┴──────────────┴───────────────┴───────────────┴────────────┘
  * ```
- *
- * If the payload fits within `maxBytesPerFragment - HEADER_SIZE`, it is sent
- * as a single fragment (index=0, total=1). The 0xF5 magic byte always marks a
- * fragmented packet, allowing the receiver to distinguish it from any legacy raw write.
  */
 object PacketFragmenter {
 
@@ -26,7 +22,7 @@ object PacketFragmenter {
     private const val FRAG_MAGIC: Byte = 0xF5.toByte()
 
     /** Total bytes consumed by the fragment header. */
-    const val HEADER_SIZE = 7  // 1 magic + 4 msgId + 1 fragIndex + 1 fragTotal
+    const val HEADER_SIZE = 9  // 1 magic + 4 msgId + 2 fragIndex + 2 fragTotal
 
     /** Monotonically increasing message ID generator — wraps on Int overflow (that's fine). */
     private val msgIdGen = AtomicInteger(0)
@@ -63,14 +59,14 @@ object PacketFragmenter {
             payload.toList().chunked(chunkSize).map { it.toByteArray() }
         }
 
-        val total = chunks.size.coerceAtMost(255).toByte()
+        val total = chunks.size.coerceAtMost(65535).toShort()
 
         return chunks.mapIndexed { index, chunk ->
             ByteBuffer.allocate(HEADER_SIZE + chunk.size).apply {
                 put(FRAG_MAGIC)
                 putInt(msgId)
-                put(index.toByte())
-                put(total)
+                putShort(index.toShort())
+                putShort(total)
                 put(chunk)
             }.array()
         }
@@ -101,8 +97,8 @@ object PacketFragmenter {
         val buf = ByteBuffer.wrap(data)
         buf.get()                                        // consume magic byte
         val msgId = buf.int
-        val fragIndex = buf.get().toInt() and 0xFF
-        val fragTotal = buf.get().toInt() and 0xFF
+        val fragIndex = buf.short.toInt() and 0xFFFF
+        val fragTotal = buf.short.toInt() and 0xFFFF
         val chunk = ByteArray(buf.remaining()).also { buf.get(it) }
 
         val key = "$senderAddress-$msgId"

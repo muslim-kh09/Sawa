@@ -1,3 +1,7 @@
+## v2.0.1
+- **Large Payload Support:** Upgraded the core packet fragmentation engine (`PacketFragmenter`) to use 16-bit indexing, increasing the maximum theoretical payload size to ~720KB (supporting up to 65,535 fragments).
+- **UI Bug Fixes:** Fixed a subtitle formatting bug on the chat screen that displayed a raw string placeholder.
+
 ## v2.0.0
 - **Premium Apple-Inspired Interface:** Completely removed the Brutalist design language in favor of a high-end, iOS-inspired aesthetic. The app now features perfectly rounded components, soft surface shadows, intuitive iOS-style navigation, pill-shaped input fields, and pristine typography for a universally welcoming user experience.
 - **Arabic Localization:** Implemented full RTL compatibility and comprehensive Arabic translations across all screens to seamlessly support Arabic-speaking users.
