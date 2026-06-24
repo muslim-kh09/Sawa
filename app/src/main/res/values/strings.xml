@@ -1,3 +1,54 @@
 <resources>
     <string name="app_name">Sawa</string>
+    
+    <!-- Onboarding -->
+    <string name="init_sequence">SYS_INIT_SEQ</string>
+    <string name="init_desc">SECURE P2P MESH // OFFLINE NODE LINK</string>
+    <string name="init_full_desc">INITIALIZING DECENTRALIZED BLE MESH NETWORK. NO UPLINK DETECTED. NO EXTERNAL SERVERS. PROCEED WITH PEER DISCOVERY.</string>
+    <string name="step_1_title">[ GRANT.PERMISSIONS ]</string>
+    <string name="step_1_desc">ACCESS REQUIRED FOR: LOCAL DEVICE DISCOVERY // MESH FORMATION // SPATIAL TRACKING</string>
+    <string name="step_1_action">GRANT_ACCESS</string>
+    <string name="step_2_title">[ ENABLE.BLUETOOTH ]</string>
+    <string name="step_2_desc">HARDWARE REQUIREMENT: BLE RADIO ACTIVE FOR PEER ADVERTISEMENT AND PACKET RELAY</string>
+    <string name="step_2_action">ENABLE_RADIO</string>
+    <string name="security_note">CRITICAL: ALL COMM TRAFFIC IS ISOLATED TO PHYSICAL BLE RANGE. ZERO EXTERNAL PING. END-TO-END CRYPTOGRAPHY ACTIVE.</string>
+    <string name="status_complete">STATUS: COMPLETE</string>
+
+    <!-- Chat -->
+    <string name="global_mesh">GLOBAL BROADCAST</string>
+    <string name="direct_connection">DIRECT PEER LINK</string>
+    <string name="scanning">SCANNING FOR NODES...</string>
+    <string name="mesh_inactive">MESH OFFLINE</string>
+    <string name="peers_online">%d NODE(S) ACTIVE</string>
+    <string name="type_message">INPUT PAYLOAD...</string>
+    <string name="no_messages">NO TELEMETRY DATA</string>
+    <string name="no_messages_desc">AWAITING PEER PACKETS // RADIO SILENCE</string>
+    <string name="active_peers">ACTIVE MESH NODES</string>
+    <string name="close">CLOSE</string>
+    <string name="unknown_peer">UNKNOWN NODE</string>
+
+    <!-- Conversations -->
+    <string name="mesh_channels">COMM FREQUENCIES</string>
+    <string name="public_channel">PUBLIC BROADCAST</string>
+    <string name="encrypted_dm">ENCRYPTED PEER CHANNEL</string>
+
+    <!-- Settings -->
+    <string name="settings_title">SYSTEM CONFIG</string>
+    <string name="appearance">DISPLAY_MODE</string>
+    <string name="security">SECURITY_PROTOCOLS</string>
+    <string name="app_lock">APP LOCK (BIO/PIN)</string>
+    <string name="identity">NODE_IDENTITY</string>
+    <string name="display_name">ALIAS IDENTIFIER</string>
+    <string name="save_name">COMMIT_ALIAS</string>
+    <string name="crypto_fingerprint">CRYPTO FINGERPRINT (SHA-256)</string>
+
+    <!-- MainActivity / Lock -->
+    <string name="app_locked">TERMINAL LOCKED</string>
+    <string name="authenticate_desc">AWAITING OPERATOR AUTHENTICATION</string>
+    <string name="unlock">UNLOCK</string>
+    <string name="setup_pin">INITIALIZE PIN</string>
+    <string name="enter_pin">INPUT PIN</string>
+    <string name="pin_desc_setup">ESTABLISH 4-DIGIT ACCESS CODE</string>
+    <string name="pin_desc_enter">PROVIDE 4-DIGIT ACCESS CODE</string>
+    <string name="save_pin">STORE_PIN</string>
 </resources>

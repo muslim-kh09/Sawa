@@ -1,12 +1,11 @@
 package com.btl.protocol.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Public
@@ -16,9 +15,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.btl.protocol.R
 import com.btl.protocol.ui.MeshViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,10 +33,10 @@ fun ConversationsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Active Mesh Chats", style = MaterialTheme.typography.headlineMedium) },
+                title = { Text("[ " + stringResource(R.string.active_peers) + " ]", style = MaterialTheme.typography.headlineMedium) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                    titleContentColor = MaterialTheme.colorScheme.primary
                 )
             )
         },
@@ -43,25 +44,23 @@ fun ConversationsScreen(
     ) { padding ->
         LazyColumn(
             contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = 24.dp, start = 16.dp, end = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
                 Spacer(Modifier.height(8.dp))
                 ConversationItem(
-                    title = "Global Mesh Broadcast",
-                    subtitle = "Public Channel",
+                    title = stringResource(R.string.global_mesh),
+                    subtitle = stringResource(R.string.public_channel),
                     icon = Icons.Filled.Public,
-                    iconColor = MaterialTheme.colorScheme.primary,
                     onClick = { onNavigateToChat("PUBLIC") }
                 )
             }
             
             items(peers.values.toList(), key = { it.nodeId }) { peer ->
                 ConversationItem(
-                    title = "Peer: ${peer.address.take(8)}...",
-                    subtitle = "End-to-End Encrypted DM",
+                    title = "PEER // ${peer.address.take(8)}",
+                    subtitle = stringResource(R.string.encrypted_dm),
                     icon = Icons.Filled.Lock,
-                    iconColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
                     onClick = { onNavigateToChat(peer.address) }
                 )
             }
@@ -74,17 +73,15 @@ private fun ConversationItem(
     title: String,
     subtitle: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    iconColor: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .clickable { onClick() },
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(20.dp),
-        shadowElevation = 0.dp
+            .clickable { onClick() }
+            .border(2.dp, MaterialTheme.colorScheme.onSurfaceVariant),
+        color = Color.Transparent,
+        shape = MaterialTheme.shapes.small
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -93,14 +90,14 @@ private fun ConversationItem(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(CircleShape)
-                    .background(iconColor.copy(alpha = 0.1f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                    .border(1.dp, MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = iconColor,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -118,6 +115,7 @@ private fun ConversationItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            Text(">", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
         }
     }
 }

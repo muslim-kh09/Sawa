@@ -17,6 +17,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
@@ -25,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.verticalScroll
@@ -34,6 +36,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.btl.protocol.R
 import com.btl.protocol.data.network.BtlMeshService
 import com.btl.protocol.ui.screens.ChatScreen
 import com.btl.protocol.ui.screens.OnboardingScreen
@@ -45,20 +48,6 @@ import androidx.lifecycle.lifecycleScope
 import com.btl.protocol.ui.utils.parseMarkdown
 import dagger.hilt.android.AndroidEntryPoint
 
-/**
- * Entry point for the Sawa application.
- *
- * ## Responsibilities
- * - Manages the runtime permission request lifecycle via [SmartPermissionHandler].
- * - Prompts the user to enable Bluetooth if needed.
- * - Starts [BtlMeshService] as a foreground service once all preconditions are met.
- * - Routes to [OnboardingScreen] or [ChatScreen] based on current state.
- *
- * ## What changed from the original
- * - Removed inline Room database instantiation (was causing double-instantiation bug).
- * - Permission logic extracted to [SmartPermissionHandler] — no more duplicated arrays.
- * - Navigation is reactive: State objects drive which screen is shown.
- */
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
@@ -87,7 +76,6 @@ class MainActivity : FragmentActivity() {
         if (bluetoothEnabled) startMeshService()
     }
 
-    // Listens for Bluetooth state changes while the app is open
     private val btStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
@@ -109,7 +97,6 @@ class MainActivity : FragmentActivity() {
 
         registerReceiver(btStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
 
-        // Re-evaluate state each time the app comes to the foreground
         lifecycle.addObserver(LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) refreshState()
         })
@@ -120,7 +107,6 @@ class MainActivity : FragmentActivity() {
 
         refreshState()
 
-        // Check for OTA updates in the background
         lifecycleScope.launch {
             val versionName = try {
                 packageManager.getPackageInfo(packageName, 0).versionName
@@ -152,31 +138,33 @@ class MainActivity : FragmentActivity() {
                 } else if (!appUnlocked) {
                     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         Column(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().padding(24.dp),
                             verticalArrangement = Arrangement.Center,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(96.dp)
-                                    .clip(androidx.compose.foundation.shape.CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Lock, contentDescription = "Locked", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
-                            }
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Text("Sawa is Locked", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Authenticate to access your messages", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "[ " + stringResource(R.string.app_locked) + " ]", 
+                                style = MaterialTheme.typography.headlineLarge, 
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                "> " + stringResource(R.string.authenticate_desc) + " _", 
+                                style = MaterialTheme.typography.bodyLarge, 
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             Spacer(modifier = Modifier.height(48.dp))
                             Button(
                                 onClick = { authenticateUser() },
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
                                 contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Transparent,
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                )
                             ) {
-                                Text("Unlock App", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimary)
+                                Text(stringResource(R.string.unlock), style = MaterialTheme.typography.titleLarge)
                             }
                         }
                     }
@@ -186,7 +174,6 @@ class MainActivity : FragmentActivity() {
                         label = "ScreenTransition",
                         transitionSpec = {
                             if (targetState == "SETTINGS") {
-                                // Pushing settings (from right to left)
                                 slideInHorizontally(
                                     animationSpec = spring(stiffness = Spring.StiffnessLow),
                                     initialOffsetX = { it }
@@ -195,7 +182,6 @@ class MainActivity : FragmentActivity() {
                                     targetOffsetX = { -it / 3 }
                                 ) + fadeOut()
                             } else {
-                                // Popping back to chat (from left to right)
                                 slideInHorizontally(
                                     animationSpec = spring(stiffness = Spring.StiffnessLow),
                                     initialOffsetX = { -it / 3 }
@@ -246,15 +232,17 @@ class MainActivity : FragmentActivity() {
                     )
                 }
 
-                // Show OTA Update Dialog if available and app is unlocked
                 if (appUnlocked) {
                     availableUpdate?.let { update ->
                         androidx.compose.material3.AlertDialog(
                             onDismissRequest = { availableUpdate = null },
-                            title = { androidx.compose.material3.Text("Update Available: v${update.versionName}") },
+                            title = { androidx.compose.material3.Text("UPDATE / v${update.versionName}", style = MaterialTheme.typography.titleLarge) },
                             text = { 
                                 Box(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                                    androidx.compose.material3.Text(update.releaseNotes.parseMarkdown()) 
+                                    androidx.compose.material3.Text(
+                                        update.releaseNotes.parseMarkdown().toString(),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    ) 
                                 }
                             },
                             confirmButton = {
@@ -262,21 +250,22 @@ class MainActivity : FragmentActivity() {
                                     availableUpdate = null
                                     OtaUpdateManager.downloadAndInstall(this@MainActivity, update.downloadUrl)
                                 }) {
-                                    androidx.compose.material3.Text("Download & Install")
+                                    androidx.compose.material3.Text("[ INSTALL ]", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
                                 }
                             },
                             dismissButton = {
                                 androidx.compose.material3.TextButton(onClick = { availableUpdate = null }) {
-                                    androidx.compose.material3.Text("Later")
+                                    androidx.compose.material3.Text("[ LATER ]", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
                                 }
-                            }
+                            },
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            shape = MaterialTheme.shapes.medium
                         )
                     }
                 }
             }
         }
         
-        // Launch Biometric Prompt on startup if enabled
         if (isAppLockEnabled) {
             authenticateUser()
         }
@@ -298,7 +287,6 @@ class MainActivity : FragmentActivity() {
         val canAuthenticate = biometricManager.canAuthenticate(authenticators)
         
         if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
-            // No biometric/pin hardware or not set up. Just let them in.
             appUnlocked = true
             return
         }
@@ -313,8 +301,8 @@ class MainActivity : FragmentActivity() {
             })
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Sawa")
-            .setSubtitle("Enter your phone's lock screen password, PIN, or scan your fingerprint to continue.")
+            .setTitle(getString(R.string.unlock))
+            .setSubtitle(getString(R.string.authenticate_desc))
             .setAllowedAuthenticators(authenticators)
             .build()
 
@@ -325,10 +313,6 @@ class MainActivity : FragmentActivity() {
         super.onDestroy()
         unregisterReceiver(btStateReceiver)
     }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Internal helpers
-    // ──────────────────────────────────────────────────────────────────────────
 
     private fun refreshState() {
         permissionsGranted = SmartPermissionHandler.allGranted(this)
@@ -361,19 +345,8 @@ class MainActivity : FragmentActivity() {
     }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Smart Permission Handler
-// ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Centralised, API-level-aware permission manager.
- *
- * Eliminates the duplicated permission arrays that existed in the original
- * [MainActivity] (the same list was copy-pasted in three separate functions).
- */
 object SmartPermissionHandler {
 
-    /** Returns the complete list of permissions required on this API level. */
     fun required(): List<String> = buildList {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             add(Manifest.permission.BLUETOOTH_SCAN)
@@ -381,17 +354,14 @@ object SmartPermissionHandler {
             add(Manifest.permission.BLUETOOTH_CONNECT)
             add(Manifest.permission.ACCESS_FINE_LOCATION)
         } else {
-            // Android 7 to 11: ONLY request ACCESS_FINE_LOCATION at runtime
             add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
 
-        // Notification permission (API 33+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
-    /** Returns true if every required permission is currently granted. */
     fun allGranted(context: Context): Boolean =
         required().all { permission ->
             context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
@@ -414,25 +384,15 @@ fun CustomPinScreen(onAuthenticated: () -> Unit) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = if (isSetupMode) "Set Up App PIN" else "Enter App PIN",
+                text = if (isSetupMode) "[ " + stringResource(R.string.setup_pin) + " ]" else "[ " + stringResource(R.string.enter_pin) + " ]",
                 style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = if (isSetupMode) "Create a 4-digit PIN to secure your chats." else "Enter your 4-digit PIN to unlock.",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "> " + (if (isSetupMode) stringResource(R.string.pin_desc_setup) else stringResource(R.string.pin_desc_enter)) + " _",
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
@@ -448,15 +408,18 @@ fun CustomPinScreen(onAuthenticated: () -> Unit) {
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword),
                 visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(0.7f),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(0.8f),
+                shape = MaterialTheme.shapes.small,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                    unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                    unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    errorIndicatorColor = MaterialTheme.colorScheme.error,
+                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground
                 ),
-                textStyle = MaterialTheme.typography.headlineLarge.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center, letterSpacing = 12.sp)
+                textStyle = MaterialTheme.typography.headlineLarge.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center, letterSpacing = 24.sp)
             )
             
             Spacer(modifier = Modifier.height(32.dp))
@@ -483,11 +446,18 @@ fun CustomPinScreen(onAuthenticated: () -> Unit) {
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth(0.7f),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
+                modifier = Modifier.fillMaxWidth(0.8f).border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
+                shape = MaterialTheme.shapes.small,
+                contentPadding = PaddingValues(vertical = 16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
             ) {
-                Text(if (isSetupMode) "Save PIN" else "Unlock", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (isSetupMode) stringResource(R.string.save_pin) else stringResource(R.string.unlock), 
+                    style = MaterialTheme.typography.titleLarge
+                )
             }
         }
     }

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ساوا</string>
+
+    <!-- Onboarding -->
+    <string name="init_sequence">تسلسل_التشغيل</string>
+    <string name="init_desc">شبكة تواصل آمنة // اتصال محلي غير متصل بالإنترنت</string>
+    <string name="init_full_desc">يتم الآن تهيئة شبكة BLE لامركزية. لم يتم اكتشاف اتصال بالإنترنت. لا توجد خوادم خارجية. المتابعة في البحث عن الأجهزة.</string>
+    <string name="step_1_title">[ منح.الصلاحيات ]</string>
+    <string name="step_1_desc">صلاحيات مطلوبة لـ: اكتشاف الأجهزة المحلية // تكوين الشبكة // التتبع المكاني</string>
+    <string name="step_1_action">منح_الصلاحيات</string>
+    <string name="step_2_title">[ تفعيل.البلوتوث ]</string>
+    <string name="step_2_desc">متطلب عتادي: تشغيل راديو BLE للإعلان عن الجهاز وتمرير الحزم</string>
+    <string name="step_2_action">تفعيل_الراديو</string>
+    <string name="security_note">تنبيه: جميع الاتصالات معزولة داخل نطاق البلوتوث الفعلي. التشفير من طرف إلى طرف فعال.</string>
+    <string name="status_complete">الحالة: مكتمل</string>
+
+    <!-- Chat -->
+    <string name="global_mesh">بث عالمي للشبكة</string>
+    <string name="direct_connection">اتصال مباشر</string>
+    <string name="scanning">جاري البحث عن العقد...</string>
+    <string name="mesh_inactive">الشبكة غير مفعلة</string>
+    <string name="peers_online">%d عقدة نشطة</string>
+    <string name="type_message">إدخال البيانات...</string>
+    <string name="no_messages">لا توجد بيانات</string>
+    <string name="no_messages_desc">في انتظار حزم الأجهزة // صمت لاسلكي</string>
+    <string name="active_peers">عقد الشبكة النشطة</string>
+    <string name="close">إغلاق</string>
+
+    <!-- Conversations -->
+    <string name="mesh_channels">ترددات الاتصال</string>
+    <string name="public_channel">البث العام</string>
+    <string name="encrypted_dm">قناة نظير مشفرة</string>
+
+    <!-- Settings -->
+    <string name="settings_title">تكوين النظام</string>
+    <string name="appearance">وضع_العرض</string>
+    <string name="security">بروتوكولات_الأمان</string>
+    <string name="app_lock">قفل التطبيق (بصمة/رمز)</string>
+    <string name="identity">هوية_العقدة</string>
+    <string name="display_name">المعرف البديل</string>
+    <string name="save_name">التزام_بالاسم</string>
+    <string name="crypto_fingerprint">بصمة التشفير (SHA-256)</string>
+
+    <!-- MainActivity / Lock -->
+    <string name="app_locked">المحطة مقفلة</string>
+    <string name="authenticate_desc">في انتظار مصادقة المشغل</string>
+    <string name="unlock">فتح</string>
+    <string name="setup_pin">تهيئة الرمز</string>
+    <string name="enter_pin">إدخال الرمز</string>
+    <string name="pin_desc_setup">تحديد رمز وصول مكون من 4 أرقام</string>
+    <string name="pin_desc_enter">توفير رمز الوصول المكون من 4 أرقام</string>
+    <string name="save_pin">حفظ_الرمز</string>
+</resources>

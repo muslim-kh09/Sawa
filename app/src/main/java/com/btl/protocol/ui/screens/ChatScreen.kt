@@ -5,36 +5,25 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.asImageBitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
 import androidx.compose.ui.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.btl.protocol.R
 import com.btl.protocol.data.repository.Message
 import com.btl.protocol.data.repository.STATUS_PENDING
 import com.btl.protocol.data.repository.STATUS_SENT
@@ -43,10 +32,6 @@ import com.btl.protocol.ui.MeshViewModel
 import com.btl.protocol.ui.utils.parseMarkdown
 import java.text.SimpleDateFormat
 import java.util.*
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Main chat screen
-// ──────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,10 +53,8 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val context = LocalContext.current
-    var showEditNameDialog by remember { mutableStateOf(false) }
     var showPeersDialog by remember { mutableStateOf(false) }
 
-    // Auto-scroll to the latest message
     val isImeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     LaunchedEffect(messages.size, isImeVisible) {
         if (messages.isNotEmpty()) {
@@ -121,9 +104,8 @@ fun ChatScreen(
                 start = 12.dp,
                 end = 12.dp
             ),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Date header
             item {
                 DateHeader(timestamp = System.currentTimeMillis())
             }
@@ -132,33 +114,17 @@ fun ChatScreen(
                 item { EmptyState() }
             } else {
                 items(messages, key = { it.id }) { message ->
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = true,
-                        enter = androidx.compose.animation.scaleIn(
-                            initialScale = 0.9f,
-                            transformOrigin = TransformOrigin(if (message.isMe) 1f else 0f, 1f),
-                            animationSpec = androidx.compose.animation.core.spring(
-                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
-                            )
-                        ) + androidx.compose.animation.fadeIn(
-                            animationSpec = androidx.compose.animation.core.tween(400)
-                        )
-                    ) {
-                        MessageBubble(message = message)
-                    }
+                    MessageBubble(message = message)
                 }
             }
         }
     }
 
-            // Removed EditNameDialog, now handled in Settings Screen
-
     if (showPeersDialog) {
         val primaryColor = MaterialTheme.colorScheme.primary
         AlertDialog(
             onDismissRequest = { showPeersDialog = false },
-            title = { Text("Active Mesh Peers", color = MaterialTheme.colorScheme.onBackground) },
+            title = { Text("[ " + stringResource(R.string.active_peers) + " ]", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
             text = {
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
                     items(peers.values.toList(), key = { it.nodeId }) { peer ->
@@ -167,43 +133,39 @@ fun ChatScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant)
                                 .clickable {
                                     showPeersDialog = false
                                     if (identity != null) {
                                         onNavigateToDm(identity.fullId)
                                     } else {
-                                        // Fallback if we don't have full ID yet
                                         android.widget.Toast.makeText(context, "Waiting for peer identity sync...", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 }
-                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                                .padding(vertical = 12.dp, horizontal = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Canvas(modifier = Modifier.size(10.dp)) {
-                                drawCircle(color = primaryColor)
-                            }
+                            Text(">", color = primaryColor, style = MaterialTheme.typography.titleMedium)
                             Spacer(Modifier.width(12.dp))
                             Column {
-                                Text(displayName, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                                Text(displayName, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleMedium)
                                 Text("RSSI: ${peer.rssi} dBm", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                             }
                         }
+                        Spacer(Modifier.height(8.dp))
                     }
                 }
             },
-            containerColor = MaterialTheme.colorScheme.background,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.medium,
             confirmButton = {
                 TextButton(onClick = { showPeersDialog = false }) {
-                    Text("Close", color = MaterialTheme.colorScheme.primary)
+                    Text("[ CLOSE ]", color = MaterialTheme.colorScheme.primary)
                 }
             }
         )
     }
 }
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Top bar
-// ──────────────────────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -221,46 +183,35 @@ private fun ChatTopBar(
 
     val isDm = conversationId != "PUBLIC"
     val titleText = if (isDm) {
-        knownIdentities.values.find { it.fullId == conversationId }?.displayName ?: "Unknown Peer"
+        knownIdentities.values.find { it.fullId == conversationId }?.displayName ?: stringResource(R.string.unknown_peer)
     } else {
-        "Global Mesh"
+        stringResource(R.string.global_mesh)
     }
     
     val subtitleText = if (isDm) {
-        "Direct connection"
+        stringResource(R.string.direct_connection)
     } else {
         if (meshActive && peerCount > 0)
-            "$peerCount peer${if (peerCount > 1) "s" else ""} online"
-        else if (meshActive) "scanning…"
-        else "mesh inactive"
+            "$peerCount " + stringResource(R.string.peers_online)
+        else if (meshActive) stringResource(R.string.scanning)
+        else stringResource(R.string.mesh_inactive)
     }
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val errorColor = MaterialTheme.colorScheme.error
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
 
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface
+            containerColor = MaterialTheme.colorScheme.background,
+            titleContentColor = MaterialTheme.colorScheme.primary
         ),
+        modifier = Modifier.border(bottom = BorderStroke(2.dp, MaterialTheme.colorScheme.onSurfaceVariant)),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Avatar (Panic Mode trigger)
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .size(40.dp)
+                        .border(2.dp, MaterialTheme.colorScheme.primary)
                         .clickable {
                             val now = System.currentTimeMillis()
                             val recentTaps = tapTimes.filter { now - it < 1000 } + now
@@ -275,136 +226,96 @@ private fun ChatTopBar(
                     Icon(
                         imageVector = if (isDm) Icons.Rounded.Person else Icons.Rounded.Hub,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(22.dp)
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.clickable { onTitleClick() }.padding(vertical = 4.dp)) {
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.clickable { onTitleClick() }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            titleText,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            titleText.uppercase(),
+                            color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.titleLarge
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Canvas(modifier = Modifier.size(8.dp)) {
-                            drawCircle(
-                                color = if (peerCount > 0 || isDm) primaryColor else errorColor,
-                                alpha = if (peerCount == 0 && !isDm) alpha else 1f
-                            )
-                        }
                     }
                     Text(
-                        subtitleText,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelMedium
+                        subtitleText.uppercase(),
+                        color = if (peerCount > 0 || isDm) MaterialTheme.colorScheme.primary else errorColor,
+                        style = MaterialTheme.typography.labelSmall
                     )
                 }
             }
         },
         actions = {
             IconButton(onClick = onSettingsClick) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
+                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
             }
-            // SOS button
             IconButton(
                 onClick = onSosClick,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(Color(0xFFB00020).copy(alpha = 0.15f))
+                modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.error)
             ) {
                 Icon(
                     imageVector = Icons.Filled.Warning,
                     contentDescription = "SOS broadcast",
-                    tint = Color(0xFFFF4444)
+                    tint = MaterialTheme.colorScheme.error
                 )
             }
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(8.dp))
         }
     )
 }
 
-// (NetworkBanner removed as requested)
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Message bubble
-// ──────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
     val isMe = message.isMe
-    val isDark = isSystemInDarkTheme()
-    
-    // Outer Shell Colors
-    val outerBg = if (isDark) Color.White.copy(alpha = 0.03f) else Color.Black.copy(alpha = 0.03f)
-    val outerBorder = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
-    
-    // Inner Core Colors
-    val innerBg = if (isDark) Color.White.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.8f)
-    val innerHighlight = if (isDark) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.5f)
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceColor = MaterialTheme.colorScheme.surface
 
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
     ) {
-        // OUTER SHELL
         Box(
             modifier = Modifier
-                .widthIn(min = 80.dp, max = 320.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(outerBg)
-                .border(1.dp, outerBorder, RoundedCornerShape(24.dp))
-                .padding(4.dp) // Outer gap
+                .widthIn(min = 120.dp, max = 340.dp)
+                .background(if (isMe) primaryColor.copy(alpha = 0.1f) else surfaceColor)
+                .border(2.dp, if (isMe) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant)
+                .padding(16.dp)
         ) {
-            // INNER CORE
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = if(isDark) 0.15f else 0.1f) else innerBg)
-                    .border(1.dp, if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else innerHighlight, RoundedCornerShape(20.dp))
-                    .padding(horizontal = 18.dp, vertical = 14.dp)
-            ) {
-                Column {
-                    if (!isMe && message.senderName != null) {
-                        Text(
-                            text = message.senderName.uppercase(),
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelMedium,
-                            letterSpacing = 0.1.em,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                    }
+            Column {
+                if (!isMe && message.senderName != null) {
+                    Text(
+                        text = "ID: " + message.senderName.uppercase(),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
 
-                    if (message.text.isNotEmpty()) {
-                        SelectionContainer {
-                            Text(
-                                text = message.text.parseMarkdown(),
-                                color = MaterialTheme.colorScheme.onBackground,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    // Timestamp + status row
-                    Row(
-                        modifier = Modifier.align(Alignment.End),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
+                if (message.text.isNotEmpty()) {
+                    SelectionContainer {
                         Text(
-                            text = formatTime(message.timestamp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace
+                            text = message.text.parseMarkdown().toString(),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            style = MaterialTheme.typography.bodyLarge
                         )
-                        if (isMe) {
-                            MessageStatusIcon(status = message.status)
-                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = formatTime(message.timestamp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    if (isMe) {
+                        Spacer(Modifier.width(8.dp))
+                        MessageStatusIcon(status = message.status)
                     }
                 }
             }
@@ -414,25 +325,13 @@ private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
 
 @Composable
 private fun MessageStatusIcon(status: Int) {
+    val iconColor = MaterialTheme.colorScheme.primary
     when (status) {
-        STATUS_PENDING -> Icon(
-            imageVector = Icons.Filled.Schedule,
-            contentDescription = "Pending",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(13.dp)
-        )
-        STATUS_SENT -> Row {
-            Icon(Icons.Filled.Check, contentDescription = "Sent", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp))
-        }
-        STATUS_DELIVERED -> Row {
-            Icon(Icons.Filled.DoneAll, contentDescription = "Delivered", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp))
-        }
+        STATUS_PENDING -> Text("[ WAIT ]", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+        STATUS_SENT -> Text("[ SENT ]", color = iconColor, style = MaterialTheme.typography.labelSmall)
+        STATUS_DELIVERED -> Text("[ RCVD ]", color = iconColor, style = MaterialTheme.typography.labelSmall)
     }
 }
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Message input bar
-// ──────────────────────────────────────────────────────────────────────────────
 
 @Composable
 private fun MessageInputBar(
@@ -441,105 +340,79 @@ private fun MessageInputBar(
     onSend: () -> Unit
 ) {
     val canSend = text.isNotBlank()
-    val context = LocalContext.current
 
-    val isDark = isSystemInDarkTheme()
-    val outerBg = if (isDark) Color.White.copy(alpha = 0.03f) else Color.Black.copy(alpha = 0.03f)
-    val outerBorder = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
-
-    // Fluid Island Outer Shell
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-            .padding(horizontal = 16.dp, vertical = 16.dp)
-            .clip(RoundedCornerShape(40.dp))
-            .background(outerBg)
-            .border(1.dp, outerBorder, RoundedCornerShape(40.dp))
-            .padding(8.dp) // Outer Bezel Padding
+            .background(MaterialTheme.colorScheme.background)
+            .border(top = BorderStroke(2.dp, MaterialTheme.colorScheme.onSurfaceVariant))
+            .padding(16.dp)
     ) {
-        // Inner Core Input Box
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(32.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextField(
-                value = text,
-                onValueChange = onTextChange,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp, max = 150.dp),
-                placeholder = {
-                    Text("Type a message...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), style = MaterialTheme.typography.bodyLarge)
-                },
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                ),
-                maxLines = 6,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onBackground)
-            )
-            Spacer(Modifier.width(8.dp))
-            
-            // Nested CTA & "Island" Button Architecture
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(enabled = canSend) { onSend() },
-                contentAlignment = Alignment.Center
+                    .weight(1f)
+                    .border(2.dp, if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    .background(MaterialTheme.colorScheme.surface)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Send,
-                        contentDescription = "Send message",
-                        tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp).offset(x = 2.dp)
-                    )
-                }
+                TextField(
+                    value = text,
+                    onValueChange = onTextChange,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp, max = 150.dp),
+                    placeholder = {
+                        Text("> " + stringResource(R.string.type_message) + "_", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    maxLines = 6,
+                    textStyle = MaterialTheme.typography.bodyLarge
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            
+            Button(
+                onClick = onSend,
+                enabled = canSend,
+                shape = MaterialTheme.shapes.small, // Brutalist 0dp shape in theme
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier.size(56.dp).border(2.dp, if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Send,
+                    contentDescription = "Send",
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     }
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ──────────────────────────────────────────────────────────────────────────────
-
 @Composable
 private fun DateHeader(timestamp: Long) {
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 12.dp, vertical = 4.dp)
-        ) {
-            Text(
-                text = formatDate(timestamp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
+        Text(
+            text = "--- " + formatDate(timestamp).uppercase() + " ---",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium
+        )
     }
-    Spacer(Modifier.height(8.dp))
 }
 
 @Composable
@@ -547,29 +420,28 @@ private fun EmptyState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 60.dp),
+            .padding(top = 80.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
-            imageVector = Icons.Rounded.Wifi,
+            imageVector = Icons.Rounded.Terminal,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(56.dp)
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(64.dp)
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
         Text(
-            "No messages yet",
+            text = "[ " + stringResource(R.string.no_messages) + " ]",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.titleLarge
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.no_messages_desc),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Once Sawa peers are in range, messages\nwill appear here automatically.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            fontSize = 13.sp,
+            style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
-            lineHeight = 18.sp
+            modifier = Modifier.padding(horizontal = 32.dp)
         )
     }
 }
@@ -581,7 +453,7 @@ private fun formatDate(ts: Long): String {
     val today = Calendar.getInstance()
     val cal = Calendar.getInstance().apply { timeInMillis = ts }
     return when {
-        today.get(Calendar.DAY_OF_YEAR) == cal.get(Calendar.DAY_OF_YEAR) -> "Today"
-        else -> SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).format(Date(ts))
+        today.get(Calendar.DAY_OF_YEAR) == cal.get(Calendar.DAY_OF_YEAR) -> "TODAY"
+        else -> SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(ts))
     }
 }
