@@ -258,7 +258,7 @@ class BtlMeshService : Service() {
         }
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKELOCK, "Sawa::MeshWakeLock")
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Sawa::MeshWakeLock")
         wakeLock?.acquire()
 
         createNotificationChannel()
