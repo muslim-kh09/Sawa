@@ -1,3 +1,9 @@
+## v1.1.0
+- **Architectural Overhaul:** Integrated the new `BinaryProtocol` and `BleFragmentation` engine to support robust byte-level data serialization over BLE MTU limits.
+- **Media Support:** Sawa now natively supports sending and receiving Images and Voice over the decentralized mesh.
+- **Aggressive Media Compression:** Added a recursive `ImageUtils` pipeline to automatically downscale and compress images under 45KB.
+- **iOS Animations:** Navigation between chat and settings now features buttery smooth Apple-style `AnimatedContent` horizontal sliding.
+
 ## v1.0.9
 - **Chat Layout Refactored:** Completely fixed the input bar keyboard overlap issue. The chat interface now perfectly hugs the top of the keyboard when it is opened.
 - **UI Simplification:** Removed the experimental Glassmorphism UI and AMOLED theme to provide a cleaner and more stable core experience.

@@ -174,6 +174,32 @@ class BtlMeshService : Service() {
             return liveService?.buildOutgoingPayload(newText)
         } 
 
+        fun buildMediaPayloadStatic(msgId: String, conversationId: String, mediaBytes: ByteArray, mediaType: String): ByteArray? {
+            processedMessageIds.add(msgId)
+            
+            val packet = BinaryProtocol.Packet(
+                type = if (mediaType == "image") 2 else 3,
+                ttl = 3,
+                timestamp = System.currentTimeMillis(),
+                flags = 0,
+                senderId = LOCAL_DEVICE_ID.toByteArray(Charsets.US_ASCII).copyOf(8),
+                payload = mediaBytes
+            )
+            val binaryData = BinaryProtocol.encode(packet)
+            
+            // We need to prepend the messageId string length and bytes to the payload so it can be tracked
+            // Actually, BinaryProtocol packet has NO messageId field, just senderId and timestamp.
+            // Let's prepend msgId, LOCAL_DEVICE_ID, DISPLAY_NAME string separated by pipes, then a null byte, then binary data.
+            val prefix = "$msgId|$LOCAL_DEVICE_ID|$DISPLAY_NAME|$conversationId\u0000"
+            val prefixBytes = prefix.toByteArray(Charsets.UTF_8)
+            
+            val finalData = ByteArray(prefixBytes.size + binaryData.size)
+            System.arraycopy(prefixBytes, 0, finalData, 0, prefixBytes.size)
+            System.arraycopy(binaryData, 0, finalData, prefixBytes.size, binaryData.size)
+            
+            return liveService?.buildOutgoingPayload(finalData)
+        } 
+
         /**
          * Enqueues a text message for broadcast to all currently known peers.
          * Called by [MeshViewModel] — thread-safe.
@@ -454,6 +480,58 @@ class BtlMeshService : Service() {
             return
         }
 
+        // --- Binary Media Parser ---
+        val rawData = payload.copyOfRange(69, payload.size)
+        val nullIndex = rawData.indexOfFirst { it == 0.toByte() }
+        if (nullIndex != -1) {
+            val prefix = String(rawData, 0, nullIndex, Charsets.UTF_8)
+            val parts = prefix.split("|")
+            if (parts.size >= 4) {
+                val msgId = parts[0]
+                val sId = parts[1]
+                val dName = parts[2]
+                val convId = parts[3]
+                
+                if (sId == LOCAL_DEVICE_ID) return
+                updateIdentity(sId, dName)
+                if (processedMessageIds.contains(msgId)) return
+                processedMessageIds.add(msgId)
+                
+                val binaryData = rawData.copyOfRange(nullIndex + 1, rawData.size)
+                if (binaryData.isNotEmpty() && binaryData[0] == BinaryProtocol.VERSION) {
+                    val packet = BinaryProtocol.decode(binaryData)
+                    if (packet != null) {
+                        val mediaType = if (packet.type == 2.toByte()) "image" else "voice"
+                        try {
+                            val file = java.io.File(applicationContext.filesDir, "$msgId.jpg")
+                            java.io.FileOutputStream(file).use { it.write(packet.payload) }
+                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                applicationContext,
+                                applicationContext.packageName + ".fileprovider",
+                                file
+                            )
+                            meshRepository.addMessage(
+                                com.btl.protocol.data.repository.Message(
+                                    messageId = msgId,
+                                    isMe = false,
+                                    text = "📷 Image",
+                                    timestamp = packet.timestamp,
+                                    senderName = dName,
+                                    conversationId = convId,
+                                    mediaUri = uri.toString(),
+                                    mediaType = mediaType
+                                )
+                            )
+                            showDmNotification(dName, "Sent an image")
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to save media", e)
+                        }
+                    }
+                }
+                return
+            }
+        }
+
         // --- Vector Sync Anti-Entropy Logic ---
         if (text.startsWith("SYNC|")) {
             val parts = text.split("|")
@@ -726,12 +804,17 @@ class BtlMeshService : Service() {
     fun buildOutgoingPayload(text: String): ByteArray {
         val seq = seqNum.getAndIncrement()
         val senderHex = identityManager.getPublicFingerprint()
-        return buildPayload(senderHex, seq, BROADCAST_TTL, text)
+        return buildPayload(senderHex, seq, BROADCAST_TTL, text.toByteArray(Charsets.UTF_8))
     }
 
-    private fun buildPayload(senderHex: String, seq: Int, ttl: Byte, text: String): ByteArray {
+    fun buildOutgoingPayload(data: ByteArray): ByteArray {
+        val seq = seqNum.getAndIncrement()
+        val senderHex = identityManager.getPublicFingerprint()
+        return buildPayload(senderHex, seq, BROADCAST_TTL, data)
+    }
+
+    private fun buildPayload(senderHex: String, seq: Int, ttl: Byte, textBytes: ByteArray): ByteArray {
         val senderBytes = senderHex.toByteArray(Charsets.US_ASCII)  // 64 bytes
-        val textBytes = text.toByteArray(Charsets.UTF_8)
         return ByteArray(senderBytes.size + 4 + 1 + textBytes.size).also { buf ->
             senderBytes.copyInto(buf, 0)
             buf[64] = ((seq shr 24) and 0xFF).toByte()

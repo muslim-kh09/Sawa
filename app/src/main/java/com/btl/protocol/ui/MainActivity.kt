@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.runtime.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -162,31 +164,57 @@ class MainActivity : FragmentActivity() {
                         }
                     }
                 } else if (pGranted && btOn) {
-                    if (currentRoute == "SETTINGS") {
-                        androidx.activity.compose.BackHandler { currentRoute = "CHAT" }
-                        SettingsScreen(
-                            onNavigateBack = { currentRoute = "CHAT" },
-                            themePreference = themePref,
-                            onThemeChange = { 
-                                themePref = it
-                                prefs.edit().putInt("themePref", it).apply()
-                            },
-                            isAppLockEnabled = isAppLockEnabled,
-                            onToggleAppLock = { enabled ->
-                                isAppLockEnabled = enabled
-                                prefs.edit().putBoolean("appLockEnabled", enabled).apply()
+                    AnimatedContent(
+                        targetState = currentRoute,
+                        label = "ScreenTransition",
+                        transitionSpec = {
+                            if (targetState == "SETTINGS") {
+                                // Pushing settings (from right to left)
+                                slideInHorizontally(
+                                    animationSpec = spring(stiffness = Spring.StiffnessLow),
+                                    initialOffsetX = { it }
+                                ) + fadeIn() togetherWith slideOutHorizontally(
+                                    animationSpec = spring(stiffness = Spring.StiffnessLow),
+                                    targetOffsetX = { -it / 3 }
+                                ) + fadeOut()
+                            } else {
+                                // Popping back to chat (from left to right)
+                                slideInHorizontally(
+                                    animationSpec = spring(stiffness = Spring.StiffnessLow),
+                                    initialOffsetX = { -it / 3 }
+                                ) + fadeIn() togetherWith slideOutHorizontally(
+                                    animationSpec = spring(stiffness = Spring.StiffnessLow),
+                                    targetOffsetX = { it }
+                                ) + fadeOut()
                             }
-                        )
-                    } else {
-                        var currentChat by remember { mutableStateOf("PUBLIC") }
-                        androidx.activity.compose.BackHandler(enabled = currentChat != "PUBLIC") {
-                            currentChat = "PUBLIC"
                         }
-                        ChatScreen(
-                            conversationId = currentChat,
-                            onNavigateToDm = { currentChat = it },
-                            onSettingsClick = { currentRoute = "SETTINGS" }
-                        )
+                    ) { route ->
+                        if (route == "SETTINGS") {
+                            androidx.activity.compose.BackHandler { currentRoute = "CHAT" }
+                            SettingsScreen(
+                                onNavigateBack = { currentRoute = "CHAT" },
+                                themePreference = themePref,
+                                onThemeChange = { 
+                                    themePref = it
+                                    prefs.edit().putInt("themePref", it).apply()
+                                },
+                                isAppLockEnabled = isAppLockEnabled,
+                                onToggleAppLock = { enabled ->
+                                    isAppLockEnabled = enabled
+                                    prefs.edit().putBoolean("appLockEnabled", enabled).apply()
+                                }
+                            )
+                        } else {
+                            var currentChat by remember { mutableStateOf("PUBLIC") }
+                            androidx.activity.compose.BackHandler(enabled = currentChat != "PUBLIC") {
+                                currentChat = "PUBLIC"
+                            }
+                            ChatScreen(
+                                conversationId = currentChat,
+                                onNavigateToDm = { currentChat = it },
+                                onSettingsClick = { currentRoute = "SETTINGS" }
+                            )
+                        }
                     }
                 } else {
                     OnboardingScreen(

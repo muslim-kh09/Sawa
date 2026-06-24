@@ -11,6 +11,13 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.ui.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
@@ -58,6 +65,15 @@ fun ChatScreen(
     var showEditNameDialog by remember { mutableStateOf(false) }
     var showPeersDialog by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.sendImageMessage(context, it, conversationId)
+        }
+    }
+
     // Auto-scroll to the latest message
     val isImeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     LaunchedEffect(messages.size, isImeVisible) {
@@ -92,6 +108,9 @@ fun ChatScreen(
                         inputText = ""
                         viewModel.sendMessage(toSend, conversationId)
                     }
+                },
+                onAttachClick = {
+                    imagePickerLauncher.launch("image/*")
                 }
             )
         }
@@ -121,9 +140,9 @@ fun ChatScreen(
                 items(messages, key = { it.id }) { message ->
                     androidx.compose.animation.AnimatedVisibility(
                         visible = true,
-                        enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it / 2 }) + androidx.compose.animation.fadeIn()
+                        enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it / 2 }) + androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically()
                     ) {
-                        MessageBubble(message = message)
+                        MessageBubble(message = message, modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
                     }
                 }
             }
@@ -311,16 +330,17 @@ private fun ChatTopBar(
 // ──────────────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun MessageBubble(message: Message) {
+private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
     val isMe = message.isMe
     val isDark = isSystemInDarkTheme()
     val bgColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f)
     val strokeColor = Color.White.copy(alpha = 0.15f)
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .padding(vertical = 2.dp)
+            .animateContentSize(),
         horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
     ) {
         Box(
@@ -341,13 +361,35 @@ private fun MessageBubble(message: Message) {
                         modifier = Modifier.padding(bottom = 2.dp)
                     )
                 }
+                
+                // Optional Media display
+                if (message.mediaUri != null) {
+                    val context = LocalContext.current
+                    val bitmap = remember(message.mediaUri) {
+                        try {
+                            val stream = context.contentResolver.openInputStream(Uri.parse(message.mediaUri))
+                            BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                        } catch (e: Exception) { null }
+                    }
+                    bitmap?.let {
+                        Image(
+                            bitmap = it,
+                            contentDescription = "Shared image",
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp).clip(RoundedCornerShape(8.dp)),
+                            contentScale = androidx.compose.ui.layout.ContentScale.FillWidth
+                        )
+                    }
+                }
+
                 // Message text
-                Text(
-                    text = message.text.parseMarkdown(),
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
-                )
+                SelectionContainer {
+                    Text(
+                        text = message.text.parseMarkdown(),
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
                 // Timestamp + status row
                 Row(
@@ -395,7 +437,8 @@ private fun MessageStatusIcon(status: Int) {
 private fun MessageInputBar(
     text: String,
     onTextChange: (String) -> Unit,
-    onSend: () -> Unit
+    onSend: () -> Unit,
+    onAttachClick: () -> Unit
 ) {
     val canSend = text.isNotBlank()
 
@@ -412,14 +455,19 @@ private fun MessageInputBar(
             modifier = Modifier.padding(end = 4.dp, top = 4.dp, bottom = 4.dp, start = 8.dp),
             verticalAlignment = Alignment.Bottom
         ) {
-            // Text field
-            TextField(
+            IconButton(onClick = onAttachClick) {
+                Icon(
+                    Icons.Rounded.Add,
+                    contentDescription = "Attach",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            BasicTextField(
                 value = text,
                 onValueChange = onTextChange,
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 48.dp, max = 120.dp),
-                placeholder = {
                     Text("Message", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp)
                 },
                 colors = TextFieldDefaults.colors(

@@ -43,7 +43,9 @@ data class Message(
     val senderName: String? = null,
     val conversationId: String = "PUBLIC",
     val signature: ByteArray? = null,
-    val isEncrypted: Boolean = false
+    val isEncrypted: Boolean = false,
+    val mediaUri: String? = null,
+    val mediaType: String? = null
 )
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -113,7 +115,7 @@ interface MessageDao {
 
 @Database(
     entities = [PacketLedgerEntity::class, Message::class, SessionKeyEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class MeshDatabase : RoomDatabase() {

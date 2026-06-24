@@ -99,6 +99,40 @@ class MeshViewModel @Inject constructor(
         }
     }
 
+    fun sendImageMessage(context: Context, uri: android.net.Uri, conversationId: String = "PUBLIC") {
+        viewModelScope.launch {
+            val msgId = java.util.UUID.randomUUID().toString()
+            val rowId = repository.addMessage(
+                Message(
+                    messageId = msgId,
+                    isMe = true,
+                    text = "📷 Image",
+                    status = STATUS_PENDING,
+                    conversationId = conversationId,
+                    mediaUri = uri.toString(),
+                    mediaType = "image"
+                )
+            )
+            if (rowId == -1L) return@launch
+
+            kotlinx.coroutines.Dispatchers.IO.invoke {
+                val compressedBytes = com.btl.protocol.data.network.ImageUtils.processImage(context, uri)
+                if (compressedBytes != null) {
+                    val payload = BtlMeshService.buildMediaPayloadStatic(msgId, conversationId, compressedBytes, "image")
+                    if (payload != null) {
+                        BtlMeshService.enqueueTransmit(payload, rowId) { success ->
+                            viewModelScope.launch {
+                                if (success) {
+                                    repository.updateStatus(rowId, STATUS_DELIVERED)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * Sends an SOS broadcast with maximum priority and appends location.
      */
