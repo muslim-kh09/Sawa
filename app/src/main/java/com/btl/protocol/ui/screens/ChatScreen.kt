@@ -380,8 +380,7 @@ private fun MessageInputBar(
                         unfocusedIndicatorColor = Color.Transparent
                     ),
                     maxLines = 6,
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                    textStyle = MaterialTheme.typography.bodyLarge
                 )
             }
             Spacer(Modifier.width(12.dp))
