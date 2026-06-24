@@ -11,6 +11,7 @@ import com.btl.protocol.data.repository.MeshRepository
 import com.btl.protocol.data.repository.Message
 import com.btl.protocol.data.repository.STATUS_PENDING
 import com.btl.protocol.data.repository.STATUS_SENT
+import com.btl.protocol.data.repository.STATUS_DELIVERED
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow

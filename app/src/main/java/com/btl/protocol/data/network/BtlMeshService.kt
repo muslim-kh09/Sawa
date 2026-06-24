@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.os.ParcelUuid
+import android.os.PowerManager
 import android.util.Log
 import com.btl.protocol.data.repository.MeshRepository
 import com.btl.protocol.data.repository.Message
@@ -235,7 +236,7 @@ class BtlMeshService : Service() {
     // drops by peers after the app is restarted.
     private val seqNum = AtomicInteger((System.currentTimeMillis() / 1000).toInt())
     
-    private var wakeLock: android.os.PowerManager.WakeLock? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
     // ──────────────────────────────────────────────────────────────────────────
     // Lifecycle
@@ -256,8 +257,8 @@ class BtlMeshService : Service() {
             prefs.edit().putString("displayName", DISPLAY_NAME).apply()
         }
 
-        val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
-        wakeLock = powerManager.newWakeLock(android.os.PowerManager.PARTIAL_WAKELOCK, "Sawa::MeshWakeLock")
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKELOCK, "Sawa::MeshWakeLock")
         wakeLock?.acquire()
 
         createNotificationChannel()
