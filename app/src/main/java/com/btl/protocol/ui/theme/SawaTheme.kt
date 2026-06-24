@@ -29,7 +29,7 @@ val LocalDarkTheme = compositionLocalOf { false }
 
 fun Modifier.glassmorphic(
     cornerRadius: Dp = 0.dp
-): Modifier = androidx.compose.ui.composed {
+): Modifier = this.composed {
     val enabled = LocalGlassmorphism.current
     val darkTheme = LocalDarkTheme.current
     if (enabled) {
