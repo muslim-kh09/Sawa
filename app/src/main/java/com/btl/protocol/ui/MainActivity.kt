@@ -88,6 +88,30 @@ class MainActivity : FragmentActivity() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    // Locale Enforcement
+    // ──────────────────────────────────────────────────────────────────────────
+
+    override fun attachBaseContext(newBase: Context) {
+        val config = android.content.res.Configuration(newBase.resources.configuration)
+        val currentLocale = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            config.locales.get(0)
+        } else {
+            @Suppress("DEPRECATION")
+            config.locale
+        }
+        
+        if (currentLocale.language != "ar" && currentLocale.language != "en") {
+            val newLocale = java.util.Locale("ar")
+            java.util.Locale.setDefault(newLocale)
+            config.setLocale(newLocale)
+            val context = newBase.createConfigurationContext(config)
+            super.attachBaseContext(context)
+        } else {
+            super.attachBaseContext(newBase)
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
     // Lifecycle
     // ──────────────────────────────────────────────────────────────────────────
 
