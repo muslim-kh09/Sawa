@@ -1,3 +1,7 @@
+## v2.0.0
+- **Industrial Brutalist Overhaul:** Completely ripped out the fluid glassmorphism and double-bezel designs. The entire app has been reconstructed using a "Tactical/Brutalist" terminal design language featuring 0dp corners, rigid thick borders, stark monospaced typography, and high-contrast elements.
+- **Arabic Localization:** Implemented full RTL compatibility and comprehensive Arabic translations across all screens (`MainActivity`, `ChatScreen`, `SettingsScreen`, etc.) to automatically sync with device locale settings.
+
 ## v1.1.3
 - **Feature Deprecation:** Completely removed Voice Messaging and all related permissions/code from the app per user request.
 
