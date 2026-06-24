@@ -1,4 +1,5 @@
-- **API 24 Initialization Fix:** Resolved immediate startup crashes on older operating systems (Android 7) by transitioning from modern `Notification.Builder` APIs to backward-compatible `NotificationCompat.Builder` implementations inside the foreground mesh service.
-- **True Glassmorphism Engine:** Achieved authentic frosted glass visuals by completely restructuring the chat layout. Active message lists now natively scroll underneath the alpha-blended TopAppBar and MessageInputBar, delivering a premium translucent aesthetic across all themes.
+- **API 24 Initialization Fix (Part 2):** Resolved a secondary startup crash on Android 7 caused by attempting to instantiate `NotificationChannel` (which was introduced in Android 8/API 26). The channel creation is now correctly guarded by an SDK version check.
+- **Glassmorphism Rebuilt:** The glass layer is now an authentic mathematical frosted UI, using carefully calculated translucent alphas and fine borders to dynamically reflect light across Light, Dark, and AMOLED profiles. Active message lists now natively scroll underneath the alpha-blended TopAppBar and MessageInputBar.
+- **Settings UI Polished:** Appearance text buttons in the Settings screen now utilize smooth horizontal scrolling, fully preventing structural text wrapping and overflows.
 - **Header Synchronization:** Addressed the "Unknown Peer" header glitch in private direct messaging by properly aligning the global device fingerprint (`fullId`) against local peer caching databases, ensuring accurate username display.
-- **Application Version:** Bumped stable engine version directly to v1.0.5.
+- **Application Version:** Bumped stable engine version directly to v1.0.6.

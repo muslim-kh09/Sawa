@@ -738,21 +738,23 @@ class BtlMeshService : Service() {
     // ──────────────────────────────────────────────────────────────────────────
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Sawa Mesh",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply { description = "Maintains the Sawa offline mesh network" }
-        
-        val dmChannel = NotificationChannel(
-            "DM_CHANNEL",
-            "Direct Messages",
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply { description = "Notifications for private messages" }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                CHANNEL_ID,
+                "Sawa Mesh",
+                android.app.NotificationManager.IMPORTANCE_LOW
+            ).apply { description = "Maintains the Sawa offline mesh network" }
+            
+            val dmChannel = android.app.NotificationChannel(
+                "DM_CHANNEL",
+                "Direct Messages",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = "Notifications for private messages" }
 
-        val nm = getSystemService(NotificationManager::class.java)
-        nm?.createNotificationChannel(channel)
-        nm?.createNotificationChannel(dmChannel)
+            val nm = getSystemService(android.app.NotificationManager::class.java)
+            nm?.createNotificationChannel(channel)
+            nm?.createNotificationChannel(dmChannel)
+        }
     }
 
     private fun buildNotification(): Notification =
