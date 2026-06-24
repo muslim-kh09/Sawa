@@ -2,53 +2,53 @@
     <string name="app_name">Sawa</string>
     
     <!-- Onboarding -->
-    <string name="init_sequence">SYS_INIT_SEQ</string>
-    <string name="init_desc">SECURE P2P MESH // OFFLINE NODE LINK</string>
-    <string name="init_full_desc">INITIALIZING DECENTRALIZED BLE MESH NETWORK. NO UPLINK DETECTED. NO EXTERNAL SERVERS. PROCEED WITH PEER DISCOVERY.</string>
-    <string name="step_1_title">[ GRANT.PERMISSIONS ]</string>
-    <string name="step_1_desc">ACCESS REQUIRED FOR: LOCAL DEVICE DISCOVERY // MESH FORMATION // SPATIAL TRACKING</string>
-    <string name="step_1_action">GRANT_ACCESS</string>
-    <string name="step_2_title">[ ENABLE.BLUETOOTH ]</string>
-    <string name="step_2_desc">HARDWARE REQUIREMENT: BLE RADIO ACTIVE FOR PEER ADVERTISEMENT AND PACKET RELAY</string>
-    <string name="step_2_action">ENABLE_RADIO</string>
-    <string name="security_note">CRITICAL: ALL COMM TRAFFIC IS ISOLATED TO PHYSICAL BLE RANGE. ZERO EXTERNAL PING. END-TO-END CRYPTOGRAPHY ACTIVE.</string>
-    <string name="status_complete">STATUS: COMPLETE</string>
+    <string name="init_sequence">Welcome</string>
+    <string name="init_desc">Secure Offline Messaging</string>
+    <string name="init_full_desc">Connect directly with people nearby using Bluetooth. No internet or servers required. Messages are end-to-end encrypted.</string>
+    <string name="step_1_title">Allow Permissions</string>
+    <string name="step_1_desc">Required to discover and connect with nearby devices.</string>
+    <string name="step_1_action">Grant Access</string>
+    <string name="step_2_title">Enable Bluetooth</string>
+    <string name="step_2_desc">Required to send and receive messages offline.</string>
+    <string name="step_2_action">Turn On Bluetooth</string>
+    <string name="security_note">All messages are end-to-end encrypted and sent directly between devices. No data is stored on servers.</string>
+    <string name="status_complete">Completed</string>
 
     <!-- Chat -->
-    <string name="global_mesh">GLOBAL BROADCAST</string>
-    <string name="direct_connection">DIRECT PEER LINK</string>
-    <string name="scanning">SCANNING FOR NODES...</string>
-    <string name="mesh_inactive">MESH OFFLINE</string>
-    <string name="peers_online">%d NODE(S) ACTIVE</string>
-    <string name="type_message">INPUT PAYLOAD...</string>
-    <string name="no_messages">NO TELEMETRY DATA</string>
-    <string name="no_messages_desc">AWAITING PEER PACKETS // RADIO SILENCE</string>
-    <string name="active_peers">ACTIVE MESH NODES</string>
-    <string name="close">CLOSE</string>
-    <string name="unknown_peer">UNKNOWN NODE</string>
+    <string name="global_mesh">Public Broadcast</string>
+    <string name="direct_connection">Direct Connection</string>
+    <string name="scanning">Scanning for nearby devices...</string>
+    <string name="mesh_inactive">Network Offline</string>
+    <string name="peers_online">%d online</string>
+    <string name="type_message">Message</string>
+    <string name="no_messages">No messages yet</string>
+    <string name="no_messages_desc">Say hello to people nearby.</string>
+    <string name="active_peers">Active Devices</string>
+    <string name="close">Close</string>
+    <string name="unknown_peer">Unknown Device</string>
 
     <!-- Conversations -->
-    <string name="mesh_channels">COMM FREQUENCIES</string>
-    <string name="public_channel">PUBLIC BROADCAST</string>
-    <string name="encrypted_dm">ENCRYPTED PEER CHANNEL</string>
+    <string name="mesh_channels">Chats</string>
+    <string name="public_channel">Public Room</string>
+    <string name="encrypted_dm">Encrypted Direct Message</string>
 
     <!-- Settings -->
-    <string name="settings_title">SYSTEM CONFIG</string>
-    <string name="appearance">DISPLAY_MODE</string>
-    <string name="security">SECURITY_PROTOCOLS</string>
-    <string name="app_lock">APP LOCK (BIO/PIN)</string>
-    <string name="identity">NODE_IDENTITY</string>
-    <string name="display_name">ALIAS IDENTIFIER</string>
-    <string name="save_name">COMMIT_ALIAS</string>
-    <string name="crypto_fingerprint">CRYPTO FINGERPRINT (SHA-256)</string>
+    <string name="settings_title">Settings</string>
+    <string name="appearance">Appearance</string>
+    <string name="security">Security</string>
+    <string name="app_lock">App Lock</string>
+    <string name="identity">Profile</string>
+    <string name="display_name">Display Name</string>
+    <string name="save_name">Save</string>
+    <string name="crypto_fingerprint">Security Fingerprint</string>
 
     <!-- MainActivity / Lock -->
-    <string name="app_locked">TERMINAL LOCKED</string>
-    <string name="authenticate_desc">AWAITING OPERATOR AUTHENTICATION</string>
-    <string name="unlock">UNLOCK</string>
-    <string name="setup_pin">INITIALIZE PIN</string>
-    <string name="enter_pin">INPUT PIN</string>
-    <string name="pin_desc_setup">ESTABLISH 4-DIGIT ACCESS CODE</string>
-    <string name="pin_desc_enter">PROVIDE 4-DIGIT ACCESS CODE</string>
-    <string name="save_pin">STORE_PIN</string>
+    <string name="app_locked">App Locked</string>
+    <string name="authenticate_desc">Verify to access your messages</string>
+    <string name="unlock">Unlock</string>
+    <string name="setup_pin">Setup PIN</string>
+    <string name="enter_pin">Enter PIN</string>
+    <string name="pin_desc_setup">Create a 4-digit code to protect your messages</string>
+    <string name="pin_desc_enter">Enter your 4-digit code</string>
+    <string name="save_pin">Save PIN</string>
 </resources>

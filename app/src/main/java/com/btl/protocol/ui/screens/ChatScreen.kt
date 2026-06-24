@@ -123,10 +123,9 @@ fun ChatScreen(
     }
 
     if (showPeersDialog) {
-        val primaryColor = MaterialTheme.colorScheme.primary
         AlertDialog(
             onDismissRequest = { showPeersDialog = false },
-            title = { Text("[ " + stringResource(R.string.active_peers) + " ]", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge) },
+            title = { Text(stringResource(R.string.active_peers), style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
             text = {
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
                     items(peers.values.toList(), key = { it.nodeId }) { peer ->
@@ -135,7 +134,8 @@ fun ChatScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 .clickable {
                                     showPeersDialog = false
                                     if (identity != null) {
@@ -144,14 +144,14 @@ fun ChatScreen(
                                         android.widget.Toast.makeText(context, "Waiting for peer identity sync...", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 }
-                                .padding(vertical = 12.dp, horizontal = 12.dp),
+                                .padding(vertical = 12.dp, horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(">", color = primaryColor, style = MaterialTheme.typography.titleMedium)
-                            Spacer(Modifier.width(12.dp))
+                            Icon(Icons.Rounded.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(16.dp))
                             Column {
                                 Text(displayName, color = MaterialTheme.colorScheme.onBackground, style = MaterialTheme.typography.titleMedium)
-                                Text("RSSI: ${peer.rssi} dBm", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Text("RSSI: ${peer.rssi} dBm", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                             }
                         }
                         Spacer(Modifier.height(8.dp))
@@ -159,10 +159,10 @@ fun ChatScreen(
                 }
             },
             containerColor = MaterialTheme.colorScheme.surface,
-            shape = MaterialTheme.shapes.medium,
+            shape = MaterialTheme.shapes.large,
             confirmButton = {
                 TextButton(onClick = { showPeersDialog = false }) {
-                    Text("[ CLOSE ]", color = MaterialTheme.colorScheme.primary)
+                    Text("Close", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                 }
             }
         )
@@ -201,27 +201,19 @@ private fun ChatTopBar(
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val errorColor = MaterialTheme.colorScheme.error
-    val borderColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            titleContentColor = MaterialTheme.colorScheme.primary
+            containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+            titleContentColor = MaterialTheme.colorScheme.onBackground
         ),
-        modifier = Modifier.drawBehind { 
-            drawLine(
-                color = borderColor, 
-                start = androidx.compose.ui.geometry.Offset(0f, size.height), 
-                end = androidx.compose.ui.geometry.Offset(size.width, size.height), 
-                strokeWidth = 2.dp.toPx()
-            ) 
-        },
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .border(2.dp, MaterialTheme.colorScheme.primary)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable {
                             val now = System.currentTimeMillis()
                             val recentTaps = tapTimes.filter { now - it < 1000 } + now
@@ -236,42 +228,37 @@ private fun ChatTopBar(
                     Icon(
                         imageVector = if (isDm) Icons.Rounded.Person else Icons.Rounded.Hub,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.clickable { onTitleClick() }) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            titleText.uppercase(),
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                    }
                     Text(
-                        subtitleText.uppercase(),
-                        color = if (peerCount > 0 || isDm) MaterialTheme.colorScheme.primary else errorColor,
+                        titleText,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+                    )
+                    Text(
+                        subtitleText,
+                        color = if (peerCount > 0 || isDm) MaterialTheme.colorScheme.onSurfaceVariant else errorColor,
                         style = MaterialTheme.typography.labelSmall
                     )
                 }
             }
         },
         actions = {
-            IconButton(onClick = onSettingsClick) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
-            }
-            IconButton(
-                onClick = onSosClick,
-                modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.error)
-            ) {
+            IconButton(onClick = onSosClick) {
                 Icon(
                     imageVector = Icons.Filled.Warning,
                     contentDescription = "SOS broadcast",
                     tint = MaterialTheme.colorScheme.error
                 )
             }
-            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = onSettingsClick) {
+                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.primary)
+            }
         }
     )
 }
@@ -280,7 +267,7 @@ private fun ChatTopBar(
 private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
     val isMe = message.isMe
     val primaryColor = MaterialTheme.colorScheme.primary
-    val surfaceColor = MaterialTheme.colorScheme.surface
+    val surfaceColor = MaterialTheme.colorScheme.surfaceVariant
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -288,18 +275,26 @@ private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
     ) {
         Box(
             modifier = Modifier
-                .widthIn(min = 120.dp, max = 340.dp)
-                .background(if (isMe) primaryColor.copy(alpha = 0.1f) else surfaceColor)
-                .border(2.dp, if (isMe) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant)
-                .padding(16.dp)
+                .widthIn(min = 80.dp, max = 280.dp)
+                .clip(
+                    androidx.compose.foundation.shape.RoundedCornerShape(
+                        topStart = 18.dp,
+                        topEnd = 18.dp,
+                        bottomStart = if (isMe) 18.dp else 4.dp,
+                        bottomEnd = if (isMe) 4.dp else 18.dp
+                    )
+                )
+                .background(if (isMe) primaryColor else surfaceColor)
+                .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
             Column {
                 if (!isMe && message.senderName != null) {
                     Text(
-                        text = "ID: " + message.senderName.uppercase(),
-                        color = MaterialTheme.colorScheme.primary,
+                        text = message.senderName,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 2.dp)
                     )
                 }
 
@@ -307,24 +302,23 @@ private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
                     SelectionContainer {
                         Text(
                             text = message.text.parseMarkdown().toString(),
-                            color = MaterialTheme.colorScheme.onBackground,
+                            color = if (isMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(4.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.align(Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = formatTime(message.timestamp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (isMe) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall
                     )
                     if (isMe) {
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(4.dp))
                         MessageStatusIcon(status = message.status)
                     }
                 }
@@ -335,11 +329,11 @@ private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
 
 @Composable
 private fun MessageStatusIcon(status: Int) {
-    val iconColor = MaterialTheme.colorScheme.primary
+    val iconColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
     when (status) {
-        STATUS_PENDING -> Text("[ WAIT ]", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-        STATUS_SENT -> Text("[ SENT ]", color = iconColor, style = MaterialTheme.typography.labelSmall)
-        STATUS_DELIVERED -> Text("[ RCVD ]", color = iconColor, style = MaterialTheme.typography.labelSmall)
+        STATUS_PENDING -> Icon(Icons.Rounded.Schedule, contentDescription = "Pending", tint = iconColor, modifier = Modifier.size(12.dp))
+        STATUS_SENT -> Icon(Icons.Rounded.Check, contentDescription = "Sent", tint = iconColor, modifier = Modifier.size(14.dp))
+        STATUS_DELIVERED -> Icon(Icons.Rounded.DoneAll, contentDescription = "Delivered", tint = iconColor, modifier = Modifier.size(14.dp))
     }
 }
 
@@ -350,22 +344,13 @@ private fun MessageInputBar(
     onSend: () -> Unit
 ) {
     val canSend = text.isNotBlank()
-    val borderColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-            .background(MaterialTheme.colorScheme.background)
-            .drawBehind {
-                drawLine(
-                    color = borderColor, 
-                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                    end = androidx.compose.ui.geometry.Offset(size.width, 0f),
-                    strokeWidth = 2.dp.toPx()
-                )
-            }
-            .padding(16.dp)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -374,15 +359,16 @@ private fun MessageInputBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .border(2.dp, if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                    .background(MaterialTheme.colorScheme.surface)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.background)
             ) {
                 TextField(
                     value = text,
                     onValueChange = onTextChange,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp, max = 150.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp, max = 150.dp),
                     placeholder = {
-                        Text("> " + stringResource(R.string.type_message) + "_", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.type_message), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     },
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
@@ -394,27 +380,24 @@ private fun MessageInputBar(
                         unfocusedIndicatorColor = Color.Transparent
                     ),
                     maxLines = 6,
-                    textStyle = MaterialTheme.typography.bodyLarge
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
                 )
             }
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(12.dp))
             
-            Button(
-                onClick = onSend,
-                enabled = canSend,
-                shape = MaterialTheme.shapes.small, // Brutalist 0dp shape in theme
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
-                contentPadding = PaddingValues(0.dp),
-                modifier = Modifier.size(56.dp).border(2.dp, if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(enabled = canSend, onClick = onSend),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Send,
+                    imageVector = Icons.Rounded.ArrowUpward,
                     contentDescription = "Send",
+                    tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -424,11 +407,12 @@ private fun MessageInputBar(
 
 @Composable
 private fun DateHeader(timestamp: Long) {
-    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
         Text(
-            text = "--- " + formatDate(timestamp).uppercase() + " ---",
+            text = formatDate(timestamp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelMedium
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
         )
     }
 }
@@ -438,20 +422,21 @@ private fun EmptyState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 80.dp),
+            .padding(top = 120.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
-            imageVector = Icons.Rounded.Terminal,
+            imageVector = Icons.Rounded.ChatBubbleOutline,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             modifier = Modifier.size(64.dp)
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
         Text(
-            text = "[ " + stringResource(R.string.no_messages) + " ]",
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.titleLarge
+            text = stringResource(R.string.no_messages),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
         )
         Spacer(Modifier.height(8.dp))
         Text(
@@ -465,13 +450,13 @@ private fun EmptyState() {
 }
 
 private fun formatTime(ts: Long): String =
-    SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ts))
+    SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(ts))
 
 private fun formatDate(ts: Long): String {
     val today = Calendar.getInstance()
     val cal = Calendar.getInstance().apply { timeInMillis = ts }
     return when {
-        today.get(Calendar.DAY_OF_YEAR) == cal.get(Calendar.DAY_OF_YEAR) -> "TODAY"
-        else -> SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(ts))
+        today.get(Calendar.DAY_OF_YEAR) == cal.get(Calendar.DAY_OF_YEAR) -> "Today"
+        else -> SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(ts))
     }
 }

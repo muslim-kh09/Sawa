@@ -2,11 +2,12 @@ package com.btl.protocol.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -18,121 +19,146 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.em
 import androidx.core.view.WindowCompat
 
-// --- TACTICAL TELEMETRY / BRUTALIST TOKENS ---
+// --- APPLE / iOS INSPIRED TOKENS ---
+private val IosBlue = Color(0xFF007AFF)
+private val IosBlueDark = Color(0xFF0A84FF)
+private val IosGreen = Color(0xFF34C759)
+private val IosRed = Color(0xFFFF3B30)
 
-val LocalDarkTheme = compositionLocalOf { true } // Forced Dark Mode
+private val IosLightBackground = Color(0xFFF2F2F7)
+private val IosLightSurface = Color(0xFFFFFFFF)
+private val IosLightOnSurface = Color(0xFF000000)
+private val IosLightOnSurfaceVariant = Color(0xFF8E8E93)
+private val IosLightDivider = Color(0xFFC6C6C8)
 
-val TacticalBackground = Color(0xFF0A0A0A) // Deactivated CRT
-val TacticalSurface = Color(0xFF121212)    // Surface depth
-val TacticalPrimary = Color(0xFFE61919)    // Aviation Red
-val TacticalOnPrimary = Color(0xFF0A0A0A)
-val TacticalText = Color(0xFFEAEAEA)       // White phosphor
-val TacticalMuted = Color(0xFF6B6B6B)
-val TacticalGreen = Color(0xFF4AF626)      // Terminal Green
-val TacticalBorder = Color(0xFF333333)
+private val IosDarkBackground = Color(0xFF000000)
+private val IosDarkSurface = Color(0xFF1C1C1E)
+private val IosDarkOnSurface = Color(0xFFFFFFFF)
+private val IosDarkOnSurfaceVariant = Color(0xFF98989D)
+private val IosDarkDivider = Color(0xFF38383A)
 
-private val BrutalistColorScheme = darkColorScheme(
-    primary = TacticalPrimary,
-    onPrimary = TacticalOnPrimary,
-    background = TacticalBackground,
-    surface = TacticalSurface,
-    onBackground = TacticalText,
-    onSurface = TacticalText,
-    secondary = TacticalGreen,
-    onSecondary = TacticalBackground,
-    surfaceVariant = TacticalSurface,
-    onSurfaceVariant = TacticalMuted,
-    outline = TacticalBorder
+private val LightColorScheme = lightColorScheme(
+    primary = IosBlue,
+    onPrimary = Color.White,
+    background = IosLightBackground,
+    onBackground = IosLightOnSurface,
+    surface = IosLightSurface,
+    onSurface = IosLightOnSurface,
+    surfaceVariant = IosLightSurface,
+    onSurfaceVariant = IosLightOnSurfaceVariant,
+    error = IosRed,
+    onError = Color.White,
+    outline = IosLightDivider
 )
 
-// --- TACTICAL TYPOGRAPHY ---
-val BrutalistTypography = Typography(
-    headlineLarge = TextStyle(
+private val DarkColorScheme = darkColorScheme(
+    primary = IosBlueDark,
+    onPrimary = Color.White,
+    background = IosDarkBackground,
+    onBackground = IosDarkOnSurface,
+    surface = IosDarkSurface,
+    onSurface = IosDarkOnSurface,
+    surfaceVariant = IosDarkSurface,
+    onSurfaceVariant = IosDarkOnSurfaceVariant,
+    error = IosRed,
+    onError = Color.White,
+    outline = IosDarkDivider
+)
+
+// --- iOS-LIKE TYPOGRAPHY ---
+val LocalThemePreference = compositionLocalOf { 0 }
+
+val AppTypography = Typography(
+    displayLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Black,
+        fontWeight = FontWeight.Bold,
         fontSize = 34.sp,
-        lineHeight = 34.sp,
-        letterSpacing = (-0.05).em
+        letterSpacing = 0.37.sp
     ),
     headlineMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Black,
-        fontSize = 24.sp,
-        lineHeight = 24.sp,
-        letterSpacing = (-0.03).em
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 28.sp,
+        letterSpacing = 0.36.sp
     ),
     titleLarge = TextStyle(
-        fontFamily = FontFamily.Monospace,
-        fontWeight = FontWeight.Bold,
-        fontSize = 18.sp,
-        lineHeight = 22.sp,
-        letterSpacing = 0.05.em
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 22.sp,
+        letterSpacing = 0.35.sp
     ),
     titleMedium = TextStyle(
-        fontFamily = FontFamily.Monospace,
-        fontWeight = FontWeight.Bold,
-        fontSize = 14.sp,
-        lineHeight = 18.sp,
-        letterSpacing = 0.05.em
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 17.sp,
+        letterSpacing = -0.41.sp
     ),
     bodyLarge = TextStyle(
-        fontFamily = FontFamily.Monospace,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.02.em
+        fontSize = 17.sp,
+        letterSpacing = -0.41.sp,
+        lineHeight = 22.sp
     ),
     bodyMedium = TextStyle(
-        fontFamily = FontFamily.Monospace,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.02.em
+        fontSize = 15.sp,
+        letterSpacing = -0.24.sp
     ),
     labelMedium = TextStyle(
-        fontFamily = FontFamily.Monospace,
-        fontWeight = FontWeight.Bold,
-        fontSize = 10.sp,
-        lineHeight = 14.sp,
-        letterSpacing = 0.1.em
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp,
+        letterSpacing = -0.08.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        letterSpacing = 0.06.sp
     )
 )
 
-val BrutalistShapes = Shapes(
-    small = CutCornerShape(0.dp),
-    medium = CutCornerShape(0.dp),
-    large = CutCornerShape(0.dp),
-    extraLarge = CutCornerShape(0.dp)
+// --- ROUNDED SHAPES ---
+val AppShapes = Shapes(
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp)
 )
 
 @Composable
 fun SawaTheme(
-    themePreference: Int = 0, // Ignored, forced tactical dark
+    themePreference: Int = 0,
     content: @Composable () -> Unit
 ) {
+    val darkTheme = when (themePreference) {
+        1 -> false
+        2 -> true
+        else -> isSystemInDarkTheme()
+    }
+    
+    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
-            window.statusBarColor = TacticalBackground.value.toInt()
-            window.navigationBarColor = TacticalBackground.value.toInt()
+            window.statusBarColor = Color.Transparent.value.toInt()
+            window.navigationBarColor = Color.Transparent.value.toInt()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
         }
     }
 
-    CompositionLocalProvider(
-        LocalDarkTheme provides true
-    ) {
+    CompositionLocalProvider(LocalThemePreference provides themePreference) {
         MaterialTheme(
-            colorScheme = BrutalistColorScheme,
-            typography = BrutalistTypography,
-            shapes = BrutalistShapes,
+            colorScheme = colorScheme,
+            typography = AppTypography,
+            shapes = AppShapes,
             content = content
         )
     }
 }
-

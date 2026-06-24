@@ -143,29 +143,31 @@ class MainActivity : FragmentActivity() {
                             verticalArrangement = Arrangement.Center,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp))
+                            Spacer(modifier = Modifier.height(24.dp))
                             Text(
-                                "[ " + stringResource(R.string.app_locked) + " ]", 
-                                style = MaterialTheme.typography.headlineLarge, 
-                                color = MaterialTheme.colorScheme.primary
+                                stringResource(R.string.app_locked), 
+                                style = MaterialTheme.typography.headlineMedium, 
+                                color = MaterialTheme.colorScheme.onBackground
                             )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                "> " + stringResource(R.string.authenticate_desc) + " _", 
+                                stringResource(R.string.authenticate_desc), 
                                 style = MaterialTheme.typography.bodyLarge, 
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.height(48.dp))
                             Button(
                                 onClick = { authenticateUser() },
-                                shape = MaterialTheme.shapes.small,
-                                modifier = Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
-                                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp),
+                                shape = MaterialTheme.shapes.large,
+                                modifier = Modifier.fillMaxWidth(0.8f),
+                                contentPadding = PaddingValues(vertical = 16.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.Transparent,
-                                    contentColor = MaterialTheme.colorScheme.primary
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                 )
                             ) {
-                                Text(stringResource(R.string.unlock), style = MaterialTheme.typography.titleLarge)
+                                Text(stringResource(R.string.unlock), style = MaterialTheme.typography.titleMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                             }
                         }
                     }
@@ -237,7 +239,7 @@ class MainActivity : FragmentActivity() {
                     availableUpdate?.let { update ->
                         androidx.compose.material3.AlertDialog(
                             onDismissRequest = { availableUpdate = null },
-                            title = { androidx.compose.material3.Text("UPDATE / v${update.versionName}", style = MaterialTheme.typography.titleLarge) },
+                            title = { androidx.compose.material3.Text("Update Available", style = MaterialTheme.typography.titleLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
                             text = { 
                                 Box(modifier = Modifier.verticalScroll(rememberScrollState())) {
                                     androidx.compose.material3.Text(
@@ -251,16 +253,16 @@ class MainActivity : FragmentActivity() {
                                     availableUpdate = null
                                     OtaUpdateManager.downloadAndInstall(this@MainActivity, update.downloadUrl)
                                 }) {
-                                    androidx.compose.material3.Text("[ INSTALL ]", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                                    androidx.compose.material3.Text("Install", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                                 }
                             },
                             dismissButton = {
                                 androidx.compose.material3.TextButton(onClick = { availableUpdate = null }) {
-                                    androidx.compose.material3.Text("[ LATER ]", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+                                    androidx.compose.material3.Text("Later", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
                                 }
                             },
                             containerColor = MaterialTheme.colorScheme.surface,
-                            shape = MaterialTheme.shapes.medium
+                            shape = MaterialTheme.shapes.large
                         )
                     }
                 }
@@ -385,14 +387,17 @@ fun CustomPinScreen(onAuthenticated: () -> Unit) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(56.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = if (isSetupMode) "[ " + stringResource(R.string.setup_pin) + " ]" else "[ " + stringResource(R.string.enter_pin) + " ]",
+                text = if (isSetupMode) stringResource(R.string.setup_pin) else stringResource(R.string.enter_pin),
                 style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "> " + (if (isSetupMode) stringResource(R.string.pin_desc_setup) else stringResource(R.string.pin_desc_enter)) + " _",
+                text = if (isSetupMode) stringResource(R.string.pin_desc_setup) else stringResource(R.string.pin_desc_enter),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -410,17 +415,17 @@ fun CustomPinScreen(onAuthenticated: () -> Unit) {
                 visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(0.8f),
-                shape = MaterialTheme.shapes.small,
+                shape = MaterialTheme.shapes.large,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                    unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
                     errorIndicatorColor = MaterialTheme.colorScheme.error,
                     focusedTextColor = MaterialTheme.colorScheme.onBackground,
                     unfocusedTextColor = MaterialTheme.colorScheme.onBackground
                 ),
-                textStyle = MaterialTheme.typography.headlineLarge.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center, letterSpacing = 24.sp)
+                textStyle = MaterialTheme.typography.displayLarge.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center, letterSpacing = 24.sp)
             )
             
             Spacer(modifier = Modifier.height(32.dp))
@@ -447,17 +452,18 @@ fun CustomPinScreen(onAuthenticated: () -> Unit) {
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth(0.8f).border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small),
-                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth(0.8f),
+                shape = MaterialTheme.shapes.large,
                 contentPadding = PaddingValues(vertical = 16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Text(
                     if (isSetupMode) stringResource(R.string.save_pin) else stringResource(R.string.unlock), 
-                    style = MaterialTheme.typography.titleLarge
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
                 )
             }
         }
