@@ -1,4 +1,4 @@
-- **Device Compatibility:** Fixed startup crashes on older Android devices related to legacy permissions and Biometrics.
-- **AMOLED Theme:** Added a true pitch-black AMOLED theme option in the Settings panel for maximum battery savings and contrast.
-- **Floating Chat Input:** Upgraded the message composer with a sleek, elevated floating pill design.
-- **Version 1.0.2 System Upgrades:** General stability and UI improvements across the mesh protocol engine.
+- **API 24 Compatibility:** Resolved fatal initialization crashes on older devices (Android 7) by implementing robust KeyStore software fallbacks where hardware-backed StrongBox is unavailable.
+- **Glassmorphism Layer:** Added a stunning, system-wide togglable Glassmorphism UI layer that introduces frosted glass, translucent alpha blending, and fine borders to active components.
+- **AMOLED Polishing:** Fixed UI element wrapping and structural breaks on smaller devices when using the Pure Black AMOLED mode.
+- **Clean Chat Console:** Removed the clunky network status banner, streamlining the chat view with an elegant pulsing dot indicator right inside the header.

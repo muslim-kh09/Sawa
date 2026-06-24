@@ -9,9 +9,42 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import android.os.Build
 
 // --- Elite Premium Colors ---
+
+val LocalGlassmorphism = compositionLocalOf { false }
+val LocalDarkTheme = compositionLocalOf { false }
+
+fun Modifier.glassmorphic(
+    cornerRadius: Dp = 0.dp
+): Modifier = androidx.compose.ui.composed {
+    val enabled = LocalGlassmorphism.current
+    val darkTheme = LocalDarkTheme.current
+    if (enabled) {
+        this.background(
+            if (darkTheme) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.15f),
+            shape = RoundedCornerShape(cornerRadius)
+        )
+        .border(
+            0.5.dp,
+            if (darkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f),
+            RoundedCornerShape(cornerRadius)
+        )
+        .clip(RoundedCornerShape(cornerRadius))
+    } else {
+        this
+    }
+}
 
 // DARK THEME
 val DarkBackground = Color(0xFF121212)
@@ -63,13 +96,13 @@ private val SawaLightColorScheme = lightColorScheme(
 
 // AMOLED THEME
 val AmoledBackground = Color(0xFF000000)
-val AmoledSurface = Color(0xFF0A0A0A)
+val AmoledSurface = Color(0xFF000000)
 val AmoledPrimary = Color(0xFF4A90E2)
 val AmoledOnPrimary = Color(0xFFFFFFFF)
 val AmoledTextPrimary = Color(0xFFE0E0E0)
 val AmoledTextSecondary = Color(0xFF888888)
 val AmoledBubbleMe = Color(0xFF152A43)
-val AmoledBubblePeer = Color(0xFF1C1C1E)
+val AmoledBubblePeer = Color(0xFF151515)
 val AmoledInputBg = Color(0xFF111111)
 
 private val SawaAmoledColorScheme = darkColorScheme(
@@ -88,6 +121,7 @@ private val SawaAmoledColorScheme = darkColorScheme(
 @Composable
 fun SawaTheme(
     themePreference: Int = 0, // 0 = System, 1 = Light, 2 = Dark, 3 = AMOLED
+    glassmorphismEnabled: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themePreference) {
@@ -112,8 +146,13 @@ fun SawaTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalGlassmorphism provides glassmorphismEnabled,
+        LocalDarkTheme provides darkTheme
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            content = content
+        )
+    }
 }

@@ -77,7 +77,8 @@ fun ChatScreen(
                 knownIdentities = knownIdentities,
                 onSettingsClick = onSettingsClick,
                 onSosClick = { viewModel.sendSos(context) },
-                onPanicClick = { viewModel.panicWipe() }
+                onPanicClick = { viewModel.panicWipe() },
+                onTitleClick = { if (peerCount > 0) showPeersDialog = true }
             ) 
         },
     ) { padding ->
@@ -87,10 +88,7 @@ fun ChatScreen(
                 .padding(top = padding.calculateTopPadding())
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // ── Network status banner
-            Box(modifier = Modifier.clickable { if (peerCount > 0) showPeersDialog = true }) {
-                NetworkBanner(peerCount = peerCount, meshActive = meshActive)
-            }
+            // Removed NetworkBanner, status dot moved to TopBar
 
             // ── Message list
             LazyColumn(
@@ -197,20 +195,20 @@ private fun ChatTopBar(
     knownIdentities: Map<String, com.btl.protocol.data.network.BtlMeshService.Companion.PeerIdentity>,
     onSettingsClick: () -> Unit,
     onSosClick: () -> Unit, 
-    onPanicClick: () -> Unit
+    onPanicClick: () -> Unit,
+    onTitleClick: () -> Unit
 ) {
     var tapTimes by remember { mutableStateOf(listOf<Long>()) }
 
     val isDm = conversationId != "PUBLIC"
     val titleText = if (isDm) {
-        val identity = knownIdentities.values.find { it.fullId == conversationId }
-        identity?.displayName ?: "Direct Message"
+        knownIdentities[conversationId]?.displayName ?: "Unknown Peer"
     } else {
-        "Sawa Mesh"
+        "Global Mesh"
     }
     
     val subtitleText = if (isDm) {
-        "Private End-to-End Encrypted"
+        "Direct connection"
     } else {
         if (meshActive && peerCount > 0)
             "$peerCount peer${if (peerCount > 1) "s" else ""} online"
@@ -218,9 +216,23 @@ private fun ChatTopBar(
         else "mesh inactive"
     }
 
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val errorColor = MaterialTheme.colorScheme.error
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
     TopAppBar(
+        modifier = Modifier.glassmorphic(),
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = if (com.btl.protocol.ui.theme.LocalGlassmorphism.current) Color.Transparent else MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.onSurface
         ),
         title = {
@@ -250,13 +262,22 @@ private fun ChatTopBar(
                     )
                 }
                 Spacer(Modifier.width(10.dp))
-                Column {
-                    Text(
-                        titleText,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
+                Column(modifier = Modifier.clickable { onTitleClick() }.padding(vertical = 4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            titleText,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Canvas(modifier = Modifier.size(6.dp)) {
+                            drawCircle(
+                                color = if (peerCount > 0 || isDm) primaryColor else errorColor,
+                                alpha = if (peerCount == 0 && !isDm) alpha else 1f
+                            )
+                        }
+                    }
                     Text(
                         subtitleText,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -287,62 +308,7 @@ private fun ChatTopBar(
     )
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Network status banner
-// ──────────────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun NetworkBanner(peerCount: Int, meshActive: Boolean) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val errorColor = MaterialTheme.colorScheme.error
-
-    AnimatedContent(
-        targetState = peerCount > 0,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
-        label = "bannerState"
-    ) { hasPeers ->
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(if (hasPeers) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.error.copy(alpha = 0.1f))
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Pulse dot
-                Canvas(modifier = Modifier.size(8.dp)) {
-                    drawCircle(
-                        color = if (hasPeers) primaryColor else errorColor,
-                        alpha = if (!hasPeers) alpha else 1f
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = if (hasPeers)
-                        "$peerCount active peer${if (peerCount > 1) "s" else ""} in mesh"
-                    else if (meshActive)
-                        "Scanning for Sawa peers…"
-                    else
-                        "Mesh offline",
-                    color = if (hasPeers) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-    }
-}
+// (NetworkBanner removed as requested)
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Message bubble
@@ -442,9 +408,10 @@ private fun MessageInputBar(
         modifier = Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .glassmorphic(28.dp),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        color = if (com.btl.protocol.ui.theme.LocalGlassmorphism.current) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         shadowElevation = 0.dp
     ) {
         Row(

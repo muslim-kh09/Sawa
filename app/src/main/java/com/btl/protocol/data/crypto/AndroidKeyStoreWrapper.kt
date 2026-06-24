@@ -2,7 +2,7 @@ package com.btl.protocol.data.crypto
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.security.keystore.StrongBoxUnavailableException
+import android.os.Build
 import android.util.Log
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -87,26 +87,26 @@ class AndroidKeyStoreWrapper @Inject constructor() {
     }
 
     private fun tryGenerateKey(strongBox: Boolean): Boolean {
+        if (strongBox && Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
         return try {
-            val spec = KeyGenParameterSpec.Builder(
+            val builder = KeyGenParameterSpec.Builder(
                 MASTER_KEY_ALIAS,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
             )
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
-                .setIsStrongBoxBacked(strongBox)
-                .build()
+                
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                builder.setIsStrongBoxBacked(strongBox)
+            }
 
             KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
-                .also { it.init(spec) }
+                .also { it.init(builder.build()) }
                 .generateKey()
 
             Log.i(TAG, "Master key generated. StrongBox=$strongBox")
             true
-        } catch (e: StrongBoxUnavailableException) {
-            Log.w(TAG, "StrongBox not available on this hardware.", e)
-            false
         } catch (e: Exception) {
             Log.e(TAG, "Key generation failed (StrongBox=$strongBox)", e)
             false
