@@ -74,51 +74,42 @@ val AppTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
-        fontSize = 34.sp,
-        letterSpacing = 0.37.sp
+        fontSize = 34.sp
     ),
     headlineMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 28.sp,
-        letterSpacing = 0.36.sp
+        fontSize = 28.sp
     ),
     titleLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 22.sp,
-        letterSpacing = 0.35.sp
+        fontSize = 22.sp
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
-        fontSize = 17.sp,
-        letterSpacing = -0.41.sp
+        fontSize = 17.sp
     ),
     bodyLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
-        fontSize = 17.sp,
-        letterSpacing = -0.41.sp,
-        lineHeight = 22.sp
+        fontSize = 17.sp
     ),
     bodyMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
-        fontSize = 15.sp,
-        letterSpacing = -0.24.sp
+        fontSize = 15.sp
     ),
     labelMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
-        fontSize = 13.sp,
-        letterSpacing = -0.08.sp
+        fontSize = 13.sp
     ),
     labelSmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        letterSpacing = 0.06.sp
+        fontSize = 11.sp
     )
 )
 
