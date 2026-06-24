@@ -463,11 +463,13 @@ private fun MessageInputBar(
                 )
             }
             
-            BasicTextField(
+            TextField(
                 value = text,
                 onValueChange = onTextChange,
                 modifier = Modifier
                     .weight(1f)
+                    .heightIn(min = 48.dp, max = 120.dp),
+                placeholder = {
                     Text("Message", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp)
                 },
                 colors = TextFieldDefaults.colors(
