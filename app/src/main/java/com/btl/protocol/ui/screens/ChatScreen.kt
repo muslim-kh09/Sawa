@@ -28,6 +28,7 @@ import com.btl.protocol.data.repository.STATUS_SENT
 import com.btl.protocol.data.repository.STATUS_DELIVERED
 import com.btl.protocol.ui.MeshViewModel
 import com.btl.protocol.ui.utils.parseMarkdown
+import com.btl.protocol.ui.theme.glassmorphic
 import java.text.SimpleDateFormat
 import java.util.*
 
