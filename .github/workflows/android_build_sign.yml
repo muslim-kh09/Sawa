@@ -103,24 +103,10 @@ jobs:
       - name: Calculate Automatic Version
         id: ext_version
         run: |
-          # Ensure tags are fetched
-          git fetch --tags origin || true
-          
-          # Get the latest tag (e.g. v1.0.0). If none exists, default to v1.0.-1
-          LATEST_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || echo "v1.0.-1")
-          
-          # Extract prefix (v1.0) and the last number (0)
-          PREFIX=${LATEST_TAG%.*}
-          LAST_NUM=${LATEST_TAG##*.}
-          
-          # Increment the number
-          NEXT_NUM=$((LAST_NUM + 1))
-          
-          # Clean version (without 'v') for outputs
-          VERSION_CLEAN="${PREFIX#v}.${NEXT_NUM}"
-          
+          # Extract the exact versionName directly from build.gradle.kts
+          VERSION_CLEAN=$(grep 'versionName = ' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
           echo "version=$VERSION_CLEAN" >> $GITHUB_OUTPUT
-          echo "Calculated Automatic Version: v$VERSION_CLEAN"
+          echo "Calculated Version from Gradle: v$VERSION_CLEAN"
 
       # ─────────────────────────────────────────────────────────────────────────
       # 10. Upload APK as workflow artifact (all runs)
