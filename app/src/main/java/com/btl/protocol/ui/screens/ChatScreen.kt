@@ -83,21 +83,21 @@ fun ChatScreen(
             ) 
         },
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = padding.calculateTopPadding())
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Removed NetworkBanner, status dot moved to TopBar
-
             // ── Message list
             LazyColumn(
                 state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = padding.calculateTopPadding() + 8.dp,
+                    bottom = padding.calculateBottomPadding() + 100.dp,
+                    start = 12.dp,
+                    end = 12.dp
+                ),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // Date header
@@ -109,9 +109,9 @@ fun ChatScreen(
                     item { EmptyState() }
                 } else {
                     items(messages, key = { it.id }) { message ->
-                        AnimatedVisibility(
+                        androidx.compose.animation.AnimatedVisibility(
                             visible = true,
-                            enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn()
+                            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it / 2 }) + androidx.compose.animation.fadeIn()
                         ) {
                             MessageBubble(message = message)
                         }
@@ -120,17 +120,19 @@ fun ChatScreen(
             }
 
             // ── Input bar
-            MessageInputBar(
-                text = inputText,
-                onTextChange = { inputText = it },
-                onSend = {
-                    val toSend = inputText.trim()
-                    if (toSend.isNotEmpty()) {
-                        inputText = ""
-                        viewModel.sendMessage(toSend, conversationId)
+            Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                MessageInputBar(
+                    text = inputText,
+                    onTextChange = { inputText = it },
+                    onSend = {
+                        val toSend = inputText.trim()
+                        if (toSend.isNotEmpty()) {
+                            inputText = ""
+                            viewModel.sendMessage(toSend, conversationId)
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     }
 
@@ -203,7 +205,7 @@ private fun ChatTopBar(
 
     val isDm = conversationId != "PUBLIC"
     val titleText = if (isDm) {
-        knownIdentities[conversationId]?.displayName ?: "Unknown Peer"
+        knownIdentities.values.find { it.fullId == conversationId }?.displayName ?: "Unknown Peer"
     } else {
         "Global Mesh"
     }

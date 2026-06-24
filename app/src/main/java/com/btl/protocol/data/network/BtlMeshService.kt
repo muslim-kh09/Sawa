@@ -756,7 +756,7 @@ class BtlMeshService : Service() {
     }
 
     private fun buildNotification(): Notification =
-        Notification.Builder(this, CHANNEL_ID)
+        androidx.core.app.NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Sawa Mesh Active")
             .setContentText("Broadcasting secure offline mesh...")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
@@ -773,7 +773,7 @@ class BtlMeshService : Service() {
             this, 0, intent, android.app.PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notif = Notification.Builder(this, "DM_CHANNEL")
+        val notif = androidx.core.app.NotificationCompat.Builder(this, "DM_CHANNEL")
             .setContentTitle("Private Message from $senderName")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
