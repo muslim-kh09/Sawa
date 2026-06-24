@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 private const val TAG = "GattOpQueue"
 private const val TARGET_MTU = 512
-private const val GATT_TIMEOUT_MS = 60_000L
+private const val GATT_TIMEOUT_MS = 300_000L
 private const val MAX_RETRIES = 1
 private const val RETRY_BASE_DELAY_MS = 500L
 private const val INTER_OP_COOLDOWN_MS = 20L
@@ -122,17 +122,23 @@ class GattOperationQueue(
                 }
                 val data = fragments[fragIndex]
                 try {
+                    val writeType = if ((char.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    } else {
+                        BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                    }
+
                     val initiated = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         gatt.writeCharacteristic(
                             char,
                             data,
-                            BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                            writeType
                         ) == android.bluetooth.BluetoothStatusCodes.SUCCESS
                     } else {
                         @Suppress("DEPRECATION")
                         char.value = data
                         @Suppress("DEPRECATION")
-                        char.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                        char.writeType = writeType
                         @Suppress("DEPRECATION")
                         gatt.writeCharacteristic(char)
                     }
@@ -228,11 +234,22 @@ class GattOperationQueue(
                         settle(false)
                         return
                     }
+                    val writeType = if ((characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
+                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    } else {
+                        BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                    }
                     fragIndex++
-                    // BitChat Optimization: 30ms packet pacing to prevent hardware buffer overflow
-                    scope.launch {
-                        delay(30)
+                    
+                    if (writeType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) {
+                        // Reliable write — the OS already waited for the GATT ACK. No pacing needed.
                         writeNext(gatt, characteristic)
+                    } else {
+                        // Unreliable write — maintain 15ms pacing to prevent hardware buffer overflow
+                        scope.launch {
+                            delay(15)
+                            writeNext(gatt, characteristic)
+                        }
                     }
                 }
             }

@@ -391,6 +391,7 @@ class BtlMeshService : Service() {
             // PROPERTY_INDICATE = server-initiated confirmed notifications (future use)
             val characteristic = BluetoothGattCharacteristic(
                 CHAR_UUID,
+                BluetoothGattCharacteristic.PROPERTY_WRITE or
                 BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE or
                 BluetoothGattCharacteristic.PROPERTY_INDICATE,
                 BluetoothGattCharacteristic.PERMISSION_WRITE
