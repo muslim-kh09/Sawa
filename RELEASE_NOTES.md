@@ -1,3 +1,8 @@
+## v1.1.2
+- **Awwwards-Tier UI Overhaul:** Rebuilt `ChatScreen` with premium "Double-Bezel" (Doppelrand) nested architecture, offering an agency-level aesthetic with haptic kinetic tension animations.
+- **Fluid Motion:** Replaced generic spring animations with custom `CubicBezier` easing curves that mimic real-world mass and spring physics.
+- **Mic Button Hotfix:** Added a safety check for quick-taps on the voice recording button. Instantly failing to hold the mic now gracefully discards the broken empty payload and warns the user instead of silently failing.
+
 ## v1.1.1
 - Added Native Interactive Voice Player UI that supports play/pause and progress tracking.
 - Fixed an issue where voice recordings would fail to send because of missing internal `cache-path` in `FileProvider`.

@@ -139,12 +139,14 @@ fun ChatScreen(
                         visible = true,
                         enter = androidx.compose.animation.scaleIn(
                             initialScale = 0.8f,
-                            transformOrigin = TransformOrigin(1f, 1f),
-                            animationSpec = androidx.compose.animation.core.spring(
-                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                            transformOrigin = TransformOrigin(if (message.isMe) 1f else 0f, 1f),
+                            animationSpec = androidx.compose.animation.core.tween(
+                                durationMillis = 700,
+                                easing = androidx.compose.animation.core.CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
                             )
-                        ) + androidx.compose.animation.fadeIn()
+                        ) + androidx.compose.animation.fadeIn(
+                            animationSpec = androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
+                        )
                     ) {
                         MessageBubble(message = message)
                     }
@@ -337,65 +339,86 @@ private fun ChatTopBar(
 private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
     val isMe = message.isMe
     val isDark = isSystemInDarkTheme()
-    val bgColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f)
-    val strokeColor = Color.White.copy(alpha = 0.15f)
+    
+    // Outer Shell Colors
+    val outerBg = if (isDark) Color.White.copy(alpha = 0.03f) else Color.Black.copy(alpha = 0.03f)
+    val outerBorder = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
+    
+    // Inner Core Colors
+    val innerBg = if (isDark) Color.White.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.8f)
+    val innerHighlight = if (isDark) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.5f)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp)
-            .animateContentSize(),
+            .padding(vertical = 6.dp)
+            .animateContentSize(animationSpec = tween(600, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))),
         horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
     ) {
+        // OUTER SHELL (Double-Bezel)
         Box(
             modifier = Modifier
-                .widthIn(min = 60.dp, max = 290.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(bgColor)
-                .border(BorderStroke(1.dp, strokeColor), RoundedCornerShape(24.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .widthIn(min = 60.dp, max = 320.dp)
+                .clip(RoundedCornerShape(32.dp))
+                .background(outerBg)
+                .border(1.dp, outerBorder, RoundedCornerShape(32.dp))
+                .padding(6.dp) // Outer gap
         ) {
-            Column {
-                if (!isMe && message.senderName != null) {
-                    Text(
-                        text = message.senderName,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    )
-                }
-                
-                // Optional Voice display
-                if (message.mediaUri != null && message.mediaType == "voice") {
-                    VoiceMessagePlayer(uriString = message.mediaUri, isMe = isMe)
-                }
-
-                if (message.text.isNotEmpty()) {
-                    // Message text
-                    SelectionContainer {
+            // INNER CORE
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = if(isDark) 0.2f else 0.1f) else innerBg)
+                    .border(1.dp, if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else innerHighlight, RoundedCornerShape(26.dp))
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Column {
+                    if (!isMe && message.senderName != null) {
+                        // Eyebrow Tag for Name
                         Text(
-                            text = message.text.parseMarkdown(),
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp
+                            text = message.senderName.uppercase(),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.1.em,
+                            modifier = Modifier.padding(bottom = 6.dp)
                         )
                     }
-                }
-                Spacer(Modifier.height(4.dp))
-                // Timestamp + status row
-                Row(
-                    modifier = Modifier.align(Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Text(
-                        text = formatTime(message.timestamp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp
-                    )
-                    if (isMe) {
-                        MessageStatusIcon(status = message.status)
+                    
+                    // Optional Voice display
+                    if (message.mediaUri != null && message.mediaType == "voice") {
+                        VoiceMessagePlayer(uriString = message.mediaUri, isMe = isMe)
+                    }
+
+                    if (message.text.isNotEmpty()) {
+                        // Message text - Grotesk/Light feel
+                        SelectionContainer {
+                            Text(
+                                text = message.text.parseMarkdown(),
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.W300,
+                                lineHeight = 22.sp
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    // Timestamp + status row
+                    Row(
+                        modifier = Modifier.align(Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = formatTime(message.timestamp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        if (isMe) {
+                            MessageStatusIcon(status = message.status)
+                        }
                     }
                 }
             }
@@ -446,27 +469,38 @@ private fun MessageInputBar(
         }
     }
 
-    Surface(
+    val isDark = isSystemInDarkTheme()
+    val outerBg = if (isDark) Color.White.copy(alpha = 0.03f) else Color.Black.copy(alpha = 0.03f)
+    val outerBorder = if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f)
+
+    // Fluid Island Outer Shell
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        shadowElevation = 0.dp
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .clip(RoundedCornerShape(40.dp))
+            .background(outerBg)
+            .border(1.dp, outerBorder, RoundedCornerShape(40.dp))
+            .padding(8.dp) // Outer Bezel Padding
     ) {
+        // Inner Core Input Box
         Row(
-            modifier = Modifier.padding(end = 4.dp, top = 4.dp, bottom = 4.dp, start = 8.dp),
-            verticalAlignment = Alignment.Bottom
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(32.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(start = 16.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
                 value = text,
                 onValueChange = onTextChange,
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 48.dp, max = 120.dp),
+                    .heightIn(min = 48.dp, max = 150.dp),
                 placeholder = {
-                    Text("Message", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp)
+                    Text("Type a message...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 16.sp, fontWeight = FontWeight.W300)
                 },
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -477,68 +511,93 @@ private fun MessageInputBar(
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent
                 ),
-                maxLines = 5,
+                maxLines = 6,
                 singleLine = false,
-                textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
+                textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.W300, lineHeight = 24.sp)
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(8.dp))
+            
+            // Nested CTA & "Island" Button Architecture
             if (canSend) {
-                // Send text FAB
-                FloatingActionButton(
-                    onClick = { onSend() },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    shape = CircleShape,
-                    modifier = Modifier.size(48.dp),
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
+                // Send Text (Button-in-Button style)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .clickable { onSend() },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Send,
-                        contentDescription = "Send message",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Send,
+                            contentDescription = "Send message",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(18.dp).offset(x = 2.dp)
+                        )
+                    }
                 }
             } else {
                 // Voice record FAB
-                val recordColor by animateColorAsState(if (isRecording) Color.Red else MaterialTheme.colorScheme.surfaceVariant)
-                val recordScale by animateFloatAsState(if (isRecording) 1.2f else 1f)
+                val recordColor by animateColorAsState(
+                    targetValue = if (isRecording) Color(0xFFFF4444) else MaterialTheme.colorScheme.surfaceVariant,
+                    animationSpec = tween(400, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
+                )
+                val recordScale by animateFloatAsState(
+                    targetValue = if (isRecording) 0.95f else 1f, // Active down-scale physical pressing
+                    animationSpec = tween(400, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
+                )
+                val iconScale by animateFloatAsState(
+                    targetValue = if (isRecording) 1.15f else 1f, // Inner icon scales up to create tension
+                    animationSpec = tween(400, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
+                )
                 
-                FloatingActionButton(
-                    onClick = {},
-                    containerColor = recordColor,
-                    shape = CircleShape,
-                    modifier = Modifier.size(48.dp).scale(recordScale).pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                    return@detectTapGestures
-                                }
-                                isRecording = true
-                                voiceRecorder = com.btl.protocol.data.media.VoiceRecorder(context)
-                                voiceFile = voiceRecorder?.startRecording()
-                                try { awaitRelease() } finally {
-                                    isRecording = false
-                                    val bytes = voiceRecorder?.stopRecording()
-                                    if (bytes != null && voiceFile != null) {
-                                        val uri = FileProvider.getUriForFile(
-                                            context,
-                                            context.packageName + ".fileprovider",
-                                            voiceFile!!
-                                        )
-                                        onSendVoice(bytes, uri)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .scale(recordScale)
+                        .clip(CircleShape)
+                        .background(recordColor)
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                        return@detectTapGestures
+                                    }
+                                    isRecording = true
+                                    voiceRecorder = com.btl.protocol.data.media.VoiceRecorder(context)
+                                    voiceFile = voiceRecorder?.startRecording()
+                                    try { awaitRelease() } finally {
+                                        isRecording = false
+                                        val bytes = voiceRecorder?.stopRecording()
+                                        if (bytes != null && voiceFile != null && bytes.size > 500) {
+                                            val uri = FileProvider.getUriForFile(
+                                                context,
+                                                context.packageName + ".fileprovider",
+                                                voiceFile!!
+                                            )
+                                            onSendVoice(bytes, uri)
+                                        } else {
+                                            android.widget.Toast.makeText(context, "Hold the microphone button to record", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 }
-                            }
-                        )
-                    },
-                    elevation = FloatingActionButtonDefaults.elevation(if (isRecording) 8.dp else 0.dp, 0.dp)
+                            )
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Mic,
                         contentDescription = "Hold to record",
                         tint = if (isRecording) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp).scale(iconScale)
                     )
                 }
             }
