@@ -32,6 +32,7 @@ fun ConversationsScreen(
     viewModel: MeshViewModel = hiltViewModel()
 ) {
     val peers by viewModel.peers.collectAsState()
+    val knownIdentities by viewModel.knownIdentities.collectAsState()
 
     Scaffold(
         topBar = {
@@ -61,8 +62,10 @@ fun ConversationsScreen(
             }
             
             items(peers.values.toList(), key = { it.nodeId }) { peer ->
+                val identity = knownIdentities[peer.nodeId]
+                val displayName = identity?.displayName ?: "Peer ${peer.address.take(4)}"
                 ConversationItem(
-                    title = peer.displayName ?: "Peer ${peer.address.take(4)}",
+                    title = displayName,
                     subtitle = stringResource(R.string.encrypted_dm),
                     icon = Icons.Filled.Lock,
                     iconBgColor = Color(0xFF34C759), // iOS Green
