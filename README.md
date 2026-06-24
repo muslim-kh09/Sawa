@@ -8,7 +8,7 @@ Sawa is an offline Bluetooth messenger. It lets you send messages without intern
 - Offline Chat: Send messages without Wi-Fi or cellular data
 - Direct Messages: Chat privately with individuals nearby
 - Public Chat: Broadcast to everyone around you
-- Media Sharing: Send images offline through the mesh (automatically compressed for BLE)
+- Media Sharing: Send low-latency voice messages offline through the mesh
 
 > **Note:** This app was coded by AI. It is incomplete and meant for testing purposes only.
 

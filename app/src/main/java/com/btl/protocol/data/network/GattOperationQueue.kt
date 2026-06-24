@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 private const val TAG = "GattOpQueue"
 private const val TARGET_MTU = 512
-private const val GATT_TIMEOUT_MS = 4_000L
+private const val GATT_TIMEOUT_MS = 60_000L
 private const val MAX_RETRIES = 1
 private const val RETRY_BASE_DELAY_MS = 500L
 private const val INTER_OP_COOLDOWN_MS = 20L

@@ -1,3 +1,8 @@
+## v1.1.1
+- Added Native Interactive Voice Player UI that supports play/pause and progress tracking.
+- Fixed an issue where voice recordings would fail to send because of missing internal `cache-path` in `FileProvider`.
+- Vastly improved support for sending Voice and Long Text messages by removing the aggressive 4-second GATT timeout, allowing MTU fragmented payloads the time they need to transfer across the mesh.
+
 ## v1.1.0
 - **Architectural Overhaul:** Integrated the new `BinaryProtocol` and `BleFragmentation` engine to support robust byte-level data serialization over BLE MTU limits.
 - **Media Support:** Sawa now natively supports sending and receiving Images and Voice over the decentralized mesh.
