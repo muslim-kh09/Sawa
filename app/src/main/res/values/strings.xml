@@ -52,4 +52,5 @@
     <string name="pin_desc_setup">قم بإنشاء رمز من 4 أرقام لحماية رسائلك</string>
     <string name="pin_desc_enter">أدخل الرمز المكون من 4 أرقام</string>
     <string name="save_pin">حفظ الرمز</string>
+    <string name="language">اللغة</string>
 </resources>

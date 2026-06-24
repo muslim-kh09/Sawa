@@ -79,6 +79,30 @@ fun SettingsScreen(
                         }
                     }
                 )
+                
+                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), modifier = Modifier.padding(start = 56.dp))
+                
+                val prefs = context.getSharedPreferences("SawaSettings", Context.MODE_PRIVATE)
+                val currentLang = prefs.getString("app_language", "ar") ?: "ar"
+                val activity = context as? android.app.Activity
+                
+                SettingsRow(
+                    icon = androidx.compose.material.icons.filled.Language,
+                    iconBgColor = Color(0xFFFF9500),
+                    title = stringResource(R.string.language),
+                    content = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ThemeOption(label = "عربي", selected = currentLang == "ar") { 
+                                prefs.edit().putString("app_language", "ar").apply()
+                                activity?.recreate()
+                            }
+                            ThemeOption(label = "English", selected = currentLang == "en") { 
+                                prefs.edit().putString("app_language", "en").apply()
+                                activity?.recreate()
+                            }
+                        }
+                    }
+                )
             }
 
             // Security Section

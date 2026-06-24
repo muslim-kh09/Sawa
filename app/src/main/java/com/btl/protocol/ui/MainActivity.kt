@@ -92,23 +92,28 @@ class MainActivity : FragmentActivity() {
     // ──────────────────────────────────────────────────────────────────────────
 
     override fun attachBaseContext(newBase: Context) {
-        val config = android.content.res.Configuration(newBase.resources.configuration)
-        val currentLocale = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-            config.locales.get(0)
-        } else {
-            @Suppress("DEPRECATION")
-            config.locale
-        }
+        val prefs = newBase.getSharedPreferences("SawaSettings", Context.MODE_PRIVATE)
+        val savedLang = prefs.getString("app_language", null)
         
-        if (currentLocale.language != "ar" && currentLocale.language != "en") {
-            val newLocale = java.util.Locale("ar")
-            java.util.Locale.setDefault(newLocale)
-            config.setLocale(newLocale)
-            val context = newBase.createConfigurationContext(config)
-            super.attachBaseContext(context)
+        val targetLang = if (savedLang != null) {
+            savedLang
         } else {
-            super.attachBaseContext(newBase)
+            val config = android.content.res.Configuration(newBase.resources.configuration)
+            val currentLocale = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                config.locales.get(0)
+            } else {
+                @Suppress("DEPRECATION")
+                config.locale
+            }
+            if (currentLocale.language != "ar" && currentLocale.language != "en") "ar" else currentLocale.language
         }
+
+        val newLocale = java.util.Locale(targetLang)
+        java.util.Locale.setDefault(newLocale)
+        val config = android.content.res.Configuration(newBase.resources.configuration)
+        config.setLocale(newLocale)
+        val context = newBase.createConfigurationContext(config)
+        super.attachBaseContext(context)
     }
 
     // ──────────────────────────────────────────────────────────────────────────
