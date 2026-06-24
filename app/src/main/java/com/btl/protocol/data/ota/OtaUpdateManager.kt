@@ -94,7 +94,24 @@ object OtaUpdateManager {
                 val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
                 if (id == downloadId) {
                     ctx.unregisterReceiver(this)
-                    installApk(ctx)
+                    
+                    val query = DownloadManager.Query().setFilterById(id)
+                    val cursor = downloadManager.query(query)
+                    var success = false
+                    if (cursor != null && cursor.moveToFirst()) {
+                        val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                        if (statusIndex >= 0) {
+                            val status = cursor.getInt(statusIndex)
+                            if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                                success = true
+                            }
+                        }
+                        cursor.close()
+                    }
+                    
+                    if (success) {
+                        installApk(ctx, downloadManager, id)
+                    }
                 }
             }
         }
@@ -107,11 +124,8 @@ object OtaUpdateManager {
         }
     }
 
-    private fun installApk(context: Context) {
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "sawa-update.apk")
-        if (!file.exists()) return
-
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    private fun installApk(context: Context, downloadManager: DownloadManager, downloadId: Long) {
+        val uri = downloadManager.getUriForDownloadedFile(downloadId) ?: return
         
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
