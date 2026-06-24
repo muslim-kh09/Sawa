@@ -138,6 +138,7 @@ fun ChatScreen(
             // Removed EditNameDialog, now handled in Settings Screen
 
     if (showPeersDialog) {
+        val primaryColor = MaterialTheme.colorScheme.primary
         AlertDialog(
             onDismissRequest = { showPeersDialog = false },
             title = { Text("Active Mesh Peers", color = MaterialTheme.colorScheme.onBackground) },
@@ -162,7 +163,7 @@ fun ChatScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Canvas(modifier = Modifier.size(10.dp)) {
-                                drawCircle(color = MaterialTheme.colorScheme.primary)
+                                drawCircle(color = primaryColor)
                             }
                             Spacer(Modifier.width(12.dp))
                             Column {
@@ -303,6 +304,9 @@ private fun NetworkBanner(peerCount: Int, meshActive: Boolean) {
         label = "pulseAlpha"
     )
 
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val errorColor = MaterialTheme.colorScheme.error
+
     AnimatedContent(
         targetState = peerCount > 0,
         transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -319,7 +323,7 @@ private fun NetworkBanner(peerCount: Int, meshActive: Boolean) {
                 // Pulse dot
                 Canvas(modifier = Modifier.size(8.dp)) {
                     drawCircle(
-                        color = if (hasPeers) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        color = if (hasPeers) primaryColor else errorColor,
                         alpha = if (!hasPeers) alpha else 1f
                     )
                 }

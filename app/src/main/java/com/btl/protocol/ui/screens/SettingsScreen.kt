@@ -33,7 +33,6 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     var displayName by remember { mutableStateOf(com.btl.protocol.data.network.BtlMeshService.DISPLAY_NAME) }
-    val identity = com.btl.protocol.data.network.BtlMeshService.getIdentity()
 
     Scaffold(
         topBar = {
@@ -117,7 +116,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text("Cryptographic Fingerprint", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(identity.fullId, fontSize = 10.sp, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(top = 4.dp))
+                        Text(com.btl.protocol.data.network.BtlMeshService.LOCAL_DEVICE_ID, fontSize = 10.sp, color = MaterialTheme.colorScheme.onBackground, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
             }
