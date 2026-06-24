@@ -112,6 +112,9 @@ private fun HeroSection() {
         label = "pulse"
     )
 
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val backgroundColor = MaterialTheme.colorScheme.background
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             contentAlignment = Alignment.Center,
@@ -121,7 +124,7 @@ private fun HeroSection() {
             Canvas(modifier = Modifier.fillMaxSize().rotate(rotation)) {
                 drawCircle(
                     brush = Brush.sweepGradient(
-                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), Color.Transparent, MaterialTheme.colorScheme.primary)
+                        listOf(primaryColor, primaryColor.copy(alpha = 0.5f), Color.Transparent, primaryColor)
                     ),
                     style = Stroke(width = 2f)
                 )
@@ -134,8 +137,8 @@ private fun HeroSection() {
                     .background(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                MaterialTheme.colorScheme.background
+                                primaryColor.copy(alpha = 0.8f),
+                                backgroundColor
                             )
                         )
                     ),
