@@ -1,3 +1,6 @@
+## v1.1.3
+- **Feature Deprecation:** Completely removed Voice Messaging and all related permissions/code from the app per user request.
+
 ## v1.1.2
 - **Awwwards-Tier UI Overhaul:** Rebuilt `ChatScreen` with premium "Double-Bezel" (Doppelrand) nested architecture, offering an agency-level aesthetic with haptic kinetic tension animations.
 - **Fluid Motion:** Replaced generic spring animations with custom `CubicBezier` easing curves that mimic real-world mass and spring physics.

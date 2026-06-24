@@ -99,36 +99,6 @@ class MeshViewModel @Inject constructor(
         }
     }
 
-    fun sendVoiceMessage(context: Context, audioBytes: ByteArray, uri: android.net.Uri, conversationId: String = "PUBLIC") {
-        viewModelScope.launch {
-            val msgId = java.util.UUID.randomUUID().toString()
-            val rowId = repository.addMessage(
-                Message(
-                    messageId = msgId,
-                    isMe = true,
-                    text = "",
-                    status = STATUS_PENDING,
-                    conversationId = conversationId,
-                    mediaUri = uri.toString(),
-                    mediaType = "voice"
-                )
-            )
-            if (rowId == -1L) return@launch
-
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                val payload = BtlMeshService.buildMediaPayloadStatic(msgId, conversationId, audioBytes, "voice")
-                if (payload != null) {
-                    BtlMeshService.enqueueTransmit(payload, rowId) { success ->
-                        viewModelScope.launch {
-                            if (success) {
-                                repository.updateStatus(rowId, STATUS_DELIVERED)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     /**
      * Sends an SOS broadcast with maximum priority and appends location.

@@ -105,9 +105,6 @@ fun ChatScreen(
                         inputText = ""
                         viewModel.sendMessage(toSend, conversationId)
                     }
-                },
-                onSendVoice = { bytes, uri ->
-                    viewModel.sendVoiceMessage(context, bytes, uri, conversationId)
                 }
             )
         }
@@ -385,11 +382,6 @@ private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
                             modifier = Modifier.padding(bottom = 6.dp)
                         )
                     }
-                    
-                    // Optional Voice display
-                    if (message.mediaUri != null && message.mediaType == "voice") {
-                        VoiceMessagePlayer(uriString = message.mediaUri, isMe = isMe)
-                    }
 
                     if (message.text.isNotEmpty()) {
                         // Message text - Grotesk/Light feel
@@ -452,22 +444,10 @@ private fun MessageStatusIcon(status: Int) {
 private fun MessageInputBar(
     text: String,
     onTextChange: (String) -> Unit,
-    onSend: () -> Unit,
-    onSendVoice: (ByteArray, Uri) -> Unit
+    onSend: () -> Unit
 ) {
     val canSend = text.isNotBlank()
     val context = LocalContext.current
-    var isRecording by remember { mutableStateOf(false) }
-    var voiceRecorder by remember { mutableStateOf<com.btl.protocol.data.media.VoiceRecorder?>(null) }
-    var voiceFile by remember { mutableStateOf<java.io.File?>(null) }
-    
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (!granted) {
-            android.widget.Toast.makeText(context, "Microphone permission required for voice messages", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
 
     val isDark = isSystemInDarkTheme()
     val outerBg = if (isDark) Color.White.copy(alpha = 0.03f) else Color.Black.copy(alpha = 0.03f)
@@ -518,86 +498,26 @@ private fun MessageInputBar(
             Spacer(Modifier.width(8.dp))
             
             // Nested CTA & "Island" Button Architecture
-            if (canSend) {
-                // Send Text (Button-in-Button style)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(enabled = canSend) { onSend() },
+                contentAlignment = Alignment.Center
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                        .clickable { onSend() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Send,
-                            contentDescription = "Send message",
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(18.dp).offset(x = 2.dp)
-                        )
-                    }
-                }
-            } else {
-                // Voice record FAB
-                val recordColor by animateColorAsState(
-                    targetValue = if (isRecording) Color(0xFFFF4444) else MaterialTheme.colorScheme.surfaceVariant,
-                    animationSpec = tween(400, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
-                )
-                val recordScale by animateFloatAsState(
-                    targetValue = if (isRecording) 0.95f else 1f, // Active down-scale physical pressing
-                    animationSpec = tween(400, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
-                )
-                val iconScale by animateFloatAsState(
-                    targetValue = if (isRecording) 1.15f else 1f, // Inner icon scales up to create tension
-                    animationSpec = tween(400, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
-                )
-                
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .scale(recordScale)
-                        .clip(CircleShape)
-                        .background(recordColor)
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                        return@detectTapGestures
-                                    }
-                                    isRecording = true
-                                    voiceRecorder = com.btl.protocol.data.media.VoiceRecorder(context)
-                                    voiceFile = voiceRecorder?.startRecording()
-                                    try { awaitRelease() } finally {
-                                        isRecording = false
-                                        val bytes = voiceRecorder?.stopRecording()
-                                        if (bytes != null && voiceFile != null && bytes.size > 500) {
-                                            val uri = FileProvider.getUriForFile(
-                                                context,
-                                                context.packageName + ".fileprovider",
-                                                voiceFile!!
-                                            )
-                                            onSendVoice(bytes, uri)
-                                        } else {
-                                            android.widget.Toast.makeText(context, "Hold the microphone button to record", android.widget.Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                }
-                            )
-                        },
+                        .background(Color.White.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Mic,
-                        contentDescription = "Hold to record",
-                        tint = if (isRecording) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp).scale(iconScale)
+                        imageVector = Icons.Rounded.Send,
+                        contentDescription = "Send message",
+                        tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp).offset(x = 2.dp)
                     )
                 }
             }
