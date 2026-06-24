@@ -29,8 +29,6 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     themePreference: Int,
     onThemeChange: (Int) -> Unit,
-    glassmorphismEnabled: Boolean,
-    onToggleGlassmorphism: (Boolean) -> Unit,
     isAppLockEnabled: Boolean,
     onToggleAppLock: (Boolean) -> Unit,
     viewModel: MeshViewModel = hiltViewModel()
@@ -74,19 +72,6 @@ fun SettingsScreen(
                     ThemeOption(label = "System", selected = themePreference == 0) { onThemeChange(0) }
                     ThemeOption(label = "Light", selected = themePreference == 1) { onThemeChange(1) }
                     ThemeOption(label = "Dark", selected = themePreference == 2) { onThemeChange(2) }
-                    ThemeOption(label = "AMOLED", selected = themePreference == 3) { onThemeChange(3) }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Frosted Glass UI", color = MaterialTheme.colorScheme.onBackground)
-                    Switch(
-                        checked = glassmorphismEnabled,
-                        onCheckedChange = onToggleGlassmorphism
-                    )
                 }
             }
 

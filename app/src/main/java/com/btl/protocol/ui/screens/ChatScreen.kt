@@ -28,7 +28,6 @@ import com.btl.protocol.data.repository.STATUS_SENT
 import com.btl.protocol.data.repository.STATUS_DELIVERED
 import com.btl.protocol.ui.MeshViewModel
 import com.btl.protocol.ui.utils.parseMarkdown
-import com.btl.protocol.ui.theme.glassmorphic
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -83,56 +82,50 @@ fun ChatScreen(
                 onTitleClick = { if (peerCount > 0) showPeersDialog = true }
             ) 
         },
+        bottomBar = {
+            MessageInputBar(
+                text = inputText,
+                onTextChange = { inputText = it },
+                onSend = {
+                    val toSend = inputText.trim()
+                    if (toSend.isNotEmpty()) {
+                        inputText = ""
+                        viewModel.sendMessage(toSend, conversationId)
+                    }
+                }
+            )
+        }
     ) { padding ->
-        Box(
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .padding(padding),
+            contentPadding = PaddingValues(
+                top = 8.dp,
+                bottom = 16.dp,
+                start = 12.dp,
+                end = 12.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // ── Message list
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = padding.calculateTopPadding() + 8.dp,
-                    bottom = padding.calculateBottomPadding() + 100.dp,
-                    start = 12.dp,
-                    end = 12.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                // Date header
-                item {
-                    DateHeader(timestamp = System.currentTimeMillis())
-                }
-
-                if (messages.isEmpty()) {
-                    item { EmptyState() }
-                } else {
-                    items(messages, key = { it.id }) { message ->
-                        androidx.compose.animation.AnimatedVisibility(
-                            visible = true,
-                            enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it / 2 }) + androidx.compose.animation.fadeIn()
-                        ) {
-                            MessageBubble(message = message)
-                        }
-                    }
-                }
+            // Date header
+            item {
+                DateHeader(timestamp = System.currentTimeMillis())
             }
 
-            // ── Input bar
-            Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-                MessageInputBar(
-                    text = inputText,
-                    onTextChange = { inputText = it },
-                    onSend = {
-                        val toSend = inputText.trim()
-                        if (toSend.isNotEmpty()) {
-                            inputText = ""
-                            viewModel.sendMessage(toSend, conversationId)
-                        }
+            if (messages.isEmpty()) {
+                item { EmptyState() }
+            } else {
+                items(messages, key = { it.id }) { message ->
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = true,
+                        enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it / 2 }) + androidx.compose.animation.fadeIn()
+                    ) {
+                        MessageBubble(message = message)
                     }
-                )
+                }
             }
         }
     }
@@ -234,9 +227,8 @@ private fun ChatTopBar(
     )
 
     TopAppBar(
-        modifier = Modifier.glassmorphic(),
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = if (com.btl.protocol.ui.theme.LocalGlassmorphism.current) Color.Transparent else MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.onSurface
         ),
         title = {
@@ -411,10 +403,9 @@ private fun MessageInputBar(
         modifier = Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-            .padding(horizontal = 12.dp, vertical = 12.dp)
-            .glassmorphic(28.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         shape = RoundedCornerShape(28.dp),
-        color = if (com.btl.protocol.ui.theme.LocalGlassmorphism.current) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         shadowElevation = 0.dp
     ) {
         Row(

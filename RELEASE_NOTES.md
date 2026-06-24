@@ -1,3 +1,11 @@
+## v1.0.9
+- **Chat Layout Refactored:** Completely fixed the input bar keyboard overlap issue. The chat interface now perfectly hugs the top of the keyboard when it is opened.
+- **UI Simplification:** Removed the experimental Glassmorphism UI and AMOLED theme to provide a cleaner and more stable core experience.
+
+## v1.0.8
+- **Core Engine Hotfix:** Addressed a critical `SecurityException` startup crash affecting all devices by explicitly declaring the `WAKE_LOCK` permission.
+- **OTA Reliability:** Auto-updates are now seamlessly handled by native DownloadManager, eliminating parsing errors and bridging the gap between programmatic and manual notification installs.
+
 ## v1.0.7
 - **Core Engine Upgrade:** Upgraded `BtlMeshService` to a bulletproof Foreground Service utilizing a `PARTIAL_WAKELOCK` to prevent background CPU/BLE standby and ensure persistent connectivity.
 - **Universal Device Synchronization:** Enforced `TRANSPORT_LE` explicit bridging across all GATT connections, resolving asymmetric hardware issues and enabling seamless communication between Android 7 and Android 14 devices.

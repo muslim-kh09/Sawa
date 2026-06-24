@@ -132,10 +132,9 @@ class MainActivity : FragmentActivity() {
         setContent {
             val prefs = getSharedPreferences("SawaSettings", Context.MODE_PRIVATE)
             var themePref by remember { mutableIntStateOf(prefs.getInt("themePref", 0)) }
-            var glassmorphismPref by remember { mutableStateOf(prefs.getBoolean("glassmorphismPref", false)) }
             var currentRoute by remember { mutableStateOf("CHAT") }
 
-            SawaTheme(themePreference = themePref, glassmorphismEnabled = glassmorphismPref) {
+            SawaTheme(themePreference = themePref) {
                 val pGranted = permissionsGranted
                 val btOn = bluetoothEnabled
 
@@ -171,11 +170,6 @@ class MainActivity : FragmentActivity() {
                             onThemeChange = { 
                                 themePref = it
                                 prefs.edit().putInt("themePref", it).apply()
-                            },
-                            glassmorphismEnabled = glassmorphismPref,
-                            onToggleGlassmorphism = { enabled ->
-                                glassmorphismPref = enabled
-                                prefs.edit().putBoolean("glassmorphismPref", enabled).apply()
                             },
                             isAppLockEnabled = isAppLockEnabled,
                             onToggleAppLock = { enabled ->
