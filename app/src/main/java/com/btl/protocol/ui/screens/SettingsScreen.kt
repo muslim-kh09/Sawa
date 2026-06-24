@@ -68,6 +68,7 @@ fun SettingsScreen(
                     ThemeOption(label = "System", selected = themePreference == 0) { onThemeChange(0) }
                     ThemeOption(label = "Light", selected = themePreference == 1) { onThemeChange(1) }
                     ThemeOption(label = "Dark", selected = themePreference == 2) { onThemeChange(2) }
+                    ThemeOption(label = "AMOLED", selected = themePreference == 3) { onThemeChange(3) }
                 }
             }
 

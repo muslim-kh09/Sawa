@@ -1,5 +1,4 @@
-- **Enterprise UI Overhaul:** Complete redesign featuring a minimalist, premium layout inspired by modern design standards.
-- **Dynamic Theming Engine:** Full support for elegant Light and Dark modes, with automatic System-default matching and manual override.
-- **Dedicated Settings Hub:** A brand new, clean settings panel replacing clunky dialogs. Manage your Cryptographic Identity, App Lock (Biometrics/PIN), and Appearance in one unified place.
-- **Ergonomic Chat Experience:** Purged distracting neon colors in favor of subtle corporate slate and muted palettes. Action buttons intuitively grouped for single-handed usage.
-- Removed outdated floating elements and bloated layouts, maximizing breathing space and readability across the app.
+- **Device Compatibility:** Fixed startup crashes on older Android devices related to legacy permissions and Biometrics.
+- **AMOLED Theme:** Added a true pitch-black AMOLED theme option in the Settings panel for maximum battery savings and contrast.
+- **Floating Chat Input:** Upgraded the message composer with a sleek, elevated floating pill design.
+- **Version 1.0.2 System Upgrades:** General stability and UI improvements across the mesh protocol engine.

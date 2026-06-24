@@ -438,53 +438,58 @@ private fun MessageInputBar(
 ) {
     val canSend = text.isNotBlank()
 
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.Bottom
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shadowElevation = 0.dp
     ) {
-        // Text field
-        TextField(
-            value = text,
-            onValueChange = onTextChange,
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(24.dp))
-                .heightIn(min = 48.dp, max = 120.dp),
-            placeholder = {
-                Text("Message", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp)
-            },
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                focusedTextColor = MaterialTheme.colorScheme.onBackground,
-                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
-                cursorColor = MaterialTheme.colorScheme.primary,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
-            maxLines = 5,
-            singleLine = false,
-            textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
-        )
-        Spacer(Modifier.width(8.dp))
-        // Send FAB
-        FloatingActionButton(
-            onClick = { if (canSend) onSend() },
-            containerColor = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-            shape = CircleShape,
-            modifier = Modifier.size(48.dp),
-            elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
+        Row(
+            modifier = Modifier.padding(end = 4.dp, top = 4.dp, bottom = 4.dp, start = 8.dp),
+            verticalAlignment = Alignment.Bottom
         ) {
-            Icon(
-                imageVector = Icons.Rounded.Send,
-                contentDescription = "Send message",
-                tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+            // Text field
+            TextField(
+                value = text,
+                onValueChange = onTextChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp, max = 120.dp),
+                placeholder = {
+                    Text("Message", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp)
+                },
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                ),
+                maxLines = 5,
+                singleLine = false,
+                textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
             )
+            Spacer(Modifier.width(4.dp))
+            // Send FAB
+            FloatingActionButton(
+                onClick = { if (canSend) onSend() },
+                containerColor = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                shape = CircleShape,
+                modifier = Modifier.size(48.dp),
+                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Send,
+                    contentDescription = "Send message",
+                    tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

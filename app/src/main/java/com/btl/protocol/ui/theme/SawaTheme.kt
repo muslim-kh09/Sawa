@@ -61,18 +61,47 @@ private val SawaLightColorScheme = lightColorScheme(
     onSurfaceVariant = LightTextSecondary
 )
 
+// AMOLED THEME
+val AmoledBackground = Color(0xFF000000)
+val AmoledSurface = Color(0xFF0A0A0A)
+val AmoledPrimary = Color(0xFF4A90E2)
+val AmoledOnPrimary = Color(0xFFFFFFFF)
+val AmoledTextPrimary = Color(0xFFE0E0E0)
+val AmoledTextSecondary = Color(0xFF888888)
+val AmoledBubbleMe = Color(0xFF152A43)
+val AmoledBubblePeer = Color(0xFF1C1C1E)
+val AmoledInputBg = Color(0xFF111111)
+
+private val SawaAmoledColorScheme = darkColorScheme(
+    primary = AmoledPrimary,
+    onPrimary = AmoledOnPrimary,
+    background = AmoledBackground,
+    surface = AmoledSurface,
+    onBackground = AmoledTextPrimary,
+    onSurface = AmoledTextPrimary,
+    secondary = AmoledBubbleMe,
+    tertiary = AmoledBubblePeer,
+    surfaceVariant = AmoledInputBg,
+    onSurfaceVariant = AmoledTextSecondary
+)
+
 @Composable
 fun SawaTheme(
-    themePreference: Int = 0, // 0 = System, 1 = Light, 2 = Dark
+    themePreference: Int = 0, // 0 = System, 1 = Light, 2 = Dark, 3 = AMOLED
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themePreference) {
         1 -> false
-        2 -> true
+        2, 3 -> true
         else -> isSystemInDarkTheme()
     }
 
-    val colorScheme = if (darkTheme) SawaDarkColorScheme else SawaLightColorScheme
+    val colorScheme = when (themePreference) {
+        1 -> SawaLightColorScheme
+        2 -> SawaDarkColorScheme
+        3 -> SawaAmoledColorScheme
+        else -> if (darkTheme) SawaDarkColorScheme else SawaLightColorScheme
+    }
 
     val view = LocalView.current
     if (!view.isInEditMode) {

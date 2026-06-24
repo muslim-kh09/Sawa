@@ -222,7 +222,12 @@ class MainActivity : FragmentActivity() {
 
     private fun authenticateUser() {
         val biometricManager = BiometricManager.from(this)
-        val canAuthenticate = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+        val authenticators = if (Build.VERSION.SDK_INT >= 30) {
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        } else {
+            BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        }
+        val canAuthenticate = biometricManager.canAuthenticate(authenticators)
         
         if (canAuthenticate != BiometricManager.BIOMETRIC_SUCCESS) {
             // No biometric/pin hardware or not set up. Just let them in.
@@ -242,7 +247,7 @@ class MainActivity : FragmentActivity() {
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Unlock Sawa")
             .setSubtitle("Enter your phone's lock screen password, PIN, or scan your fingerprint to continue.")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            .setAllowedAuthenticators(authenticators)
             .build()
 
         biometricPrompt.authenticate(promptInfo)
@@ -306,11 +311,8 @@ object SmartPermissionHandler {
         add(Manifest.permission.ACCESS_FINE_LOCATION)
         add(Manifest.permission.ACCESS_COARSE_LOCATION)
 
-        // Legacy Bluetooth permissions (API < 31)
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            add(Manifest.permission.BLUETOOTH)
-            add(Manifest.permission.BLUETOOTH_ADMIN)
-        }
+        // Note: BLUETOOTH and BLUETOOTH_ADMIN are install-time on API < 31.
+        // Requesting them at runtime causes SecurityException/IllegalArgumentException on older Android devices.
 
         // Modern Bluetooth permissions (API 31+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
