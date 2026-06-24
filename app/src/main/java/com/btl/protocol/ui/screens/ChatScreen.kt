@@ -16,6 +16,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -199,13 +201,21 @@ private fun ChatTopBar(
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val errorColor = MaterialTheme.colorScheme.error
+    val borderColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background,
             titleContentColor = MaterialTheme.colorScheme.primary
         ),
-        modifier = Modifier.border(bottom = BorderStroke(2.dp, MaterialTheme.colorScheme.onSurfaceVariant)),
+        modifier = Modifier.drawBehind { 
+            drawLine(
+                color = borderColor, 
+                start = androidx.compose.ui.geometry.Offset(0f, size.height), 
+                end = androidx.compose.ui.geometry.Offset(size.width, size.height), 
+                strokeWidth = 2.dp.toPx()
+            ) 
+        },
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -340,13 +350,21 @@ private fun MessageInputBar(
     onSend: () -> Unit
 ) {
     val canSend = text.isNotBlank()
+    val borderColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
             .background(MaterialTheme.colorScheme.background)
-            .border(top = BorderStroke(2.dp, MaterialTheme.colorScheme.onSurfaceVariant))
+            .drawBehind {
+                drawLine(
+                    color = borderColor, 
+                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                    end = androidx.compose.ui.geometry.Offset(size.width, 0f),
+                    strokeWidth = 2.dp.toPx()
+                )
+            }
             .padding(16.dp)
     ) {
         Row(
