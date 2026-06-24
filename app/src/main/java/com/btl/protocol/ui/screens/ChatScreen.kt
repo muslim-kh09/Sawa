@@ -32,22 +32,6 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Colour tokens
-// ──────────────────────────────────────────────────────────────────────────────
-
-private val ColorHeader        = Color(0xFF075E54)
-private val ColorHeaderLight   = Color(0xFF128C7E)
-private val ColorBackground    = Color(0xFF0D1117)   // Dark Navy/Black background
-private val ColorBubbleMe      = Color(0xFF005C4B)   // WhatsApp Green — sent
-private val ColorBubblePeer    = Color(0xFF202C33)   // Dark Gray — received
-private val ColorInputBg       = Color(0xFF1F2C34)
-private val ColorSendBtn       = Color(0xFF00A884)
-private val ColorPeerOnline    = Color(0xFF25D366)
-private val ColorTimestamp     = Color(0xFF8696A0)
-private val ColorTextPrimary   = Color(0xFFE9EDEF)
-private val ColorTextSecondary = Color(0xFF8696A0)
-
-// ──────────────────────────────────────────────────────────────────────────────
 // Main chat screen
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -56,8 +40,7 @@ private val ColorTextSecondary = Color(0xFF8696A0)
 fun ChatScreen(
     conversationId: String = "PUBLIC", 
     onNavigateToDm: (String) -> Unit = {},
-    isAppLockEnabled: Boolean = false,
-    onToggleAppLock: (Boolean) -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     viewModel: MeshViewModel = hiltViewModel()
 ) {
     val allMessages by viewModel.messages.collectAsState()
@@ -85,18 +68,16 @@ fun ChatScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets.systemBars,
-        containerColor = ColorBackground,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = { 
             ChatTopBar(
                 peerCount = peerCount, 
                 meshActive = meshActive, 
                 conversationId = conversationId,
                 knownIdentities = knownIdentities,
-                isAppLockEnabled = isAppLockEnabled,
-                onToggleAppLock = onToggleAppLock,
+                onSettingsClick = onSettingsClick,
                 onSosClick = { viewModel.sendSos(context) },
-                onPanicClick = { viewModel.panicWipe() },
-                onEditNameClick = { showEditNameDialog = true }
+                onPanicClick = { viewModel.panicWipe() }
             ) 
         },
     ) { padding ->
@@ -104,7 +85,7 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = padding.calculateTopPadding())
-                .background(ColorBackground)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             // ── Network status banner
             Box(modifier = Modifier.clickable { if (peerCount > 0) showPeersDialog = true }) {
@@ -154,45 +135,12 @@ fun ChatScreen(
         }
     }
 
-    if (showEditNameDialog) {
-        var newName by remember { mutableStateOf(com.btl.protocol.data.network.BtlMeshService.DISPLAY_NAME) }
-        AlertDialog(
-            onDismissRequest = { showEditNameDialog = false },
-            title = { Text("Edit Display Name", color = ColorTextPrimary) },
-            text = {
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    singleLine = true,
-                    colors = TextFieldDefaults.colors(
-                        focusedTextColor = ColorTextPrimary,
-                        unfocusedTextColor = ColorTextPrimary,
-                        focusedContainerColor = ColorInputBg,
-                        unfocusedContainerColor = ColorInputBg
-                    )
-                )
-            },
-            containerColor = ColorBackground,
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.updateDisplayName(context, newName)
-                    showEditNameDialog = false
-                }) {
-                    Text("Save", color = ColorSendBtn)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditNameDialog = false }) {
-                    Text("Cancel", color = ColorTextSecondary)
-                }
-            }
-        )
-    }
+            // Removed EditNameDialog, now handled in Settings Screen
 
     if (showPeersDialog) {
         AlertDialog(
             onDismissRequest = { showPeersDialog = false },
-            title = { Text("Active Mesh Peers", color = ColorTextPrimary) },
+            title = { Text("Active Mesh Peers", color = MaterialTheme.colorScheme.onBackground) },
             text = {
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
                     items(peers.values.toList(), key = { it.nodeId }) { peer ->
@@ -214,21 +162,21 @@ fun ChatScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Canvas(modifier = Modifier.size(10.dp)) {
-                                drawCircle(color = ColorPeerOnline)
+                                drawCircle(color = MaterialTheme.colorScheme.primary)
                             }
                             Spacer(Modifier.width(12.dp))
                             Column {
-                                Text(displayName, color = ColorTextPrimary, fontWeight = FontWeight.Bold)
-                                Text("RSSI: ${peer.rssi} dBm", color = ColorTextSecondary, fontSize = 12.sp)
+                                Text(displayName, color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Bold)
+                                Text("RSSI: ${peer.rssi} dBm", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                             }
                         }
                     }
                 }
             },
-            containerColor = ColorBackground,
+            containerColor = MaterialTheme.colorScheme.background,
             confirmButton = {
                 TextButton(onClick = { showPeersDialog = false }) {
-                    Text("Close", color = ColorSendBtn)
+                    Text("Close", color = MaterialTheme.colorScheme.primary)
                 }
             }
         )
@@ -246,11 +194,9 @@ private fun ChatTopBar(
     meshActive: Boolean, 
     conversationId: String,
     knownIdentities: Map<String, com.btl.protocol.data.network.BtlMeshService.Companion.PeerIdentity>,
-    isAppLockEnabled: Boolean,
-    onToggleAppLock: (Boolean) -> Unit,
+    onSettingsClick: () -> Unit,
     onSosClick: () -> Unit, 
-    onPanicClick: () -> Unit, 
-    onEditNameClick: () -> Unit
+    onPanicClick: () -> Unit
 ) {
     var tapTimes by remember { mutableStateOf(listOf<Long>()) }
 
@@ -272,7 +218,10 @@ private fun ChatTopBar(
     }
 
     TopAppBar(
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = ColorHeader),
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface
+        ),
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Avatar (Panic Mode trigger)
@@ -280,11 +229,7 @@ private fun ChatTopBar(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(ColorHeaderLight, ColorHeader)
-                            )
-                        )
+                        .background(MaterialTheme.colorScheme.primary)
                         .clickable {
                             val now = System.currentTimeMillis()
                             val recentTaps = tapTimes.filter { now - it < 1000 } + now
@@ -299,7 +244,7 @@ private fun ChatTopBar(
                     Icon(
                         imageVector = if (isDm) Icons.Rounded.Person else Icons.Rounded.Hub,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -307,28 +252,21 @@ private fun ChatTopBar(
                 Column {
                     Text(
                         titleText,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        fontSize = 18.sp
                     )
                     Text(
                         subtitleText,
-                        color = ColorTextSecondary,
-                        fontSize = 12.sp
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
                     )
                 }
             }
         },
         actions = {
-            IconButton(onClick = { onToggleAppLock(!isAppLockEnabled) }) {
-                Icon(
-                    imageVector = if (isAppLockEnabled) Icons.Filled.Lock else Icons.Filled.LockOpen, 
-                    contentDescription = "Toggle App Lock", 
-                    tint = Color.White
-                )
-            }
-            IconButton(onClick = onEditNameClick) {
-                Icon(Icons.Filled.Edit, contentDescription = "Edit Name", tint = Color.White)
+            IconButton(onClick = onSettingsClick) {
+                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
             }
             // SOS button
             IconButton(
@@ -373,7 +311,7 @@ private fun NetworkBanner(peerCount: Int, meshActive: Boolean) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(if (hasPeers) Color(0xFF01382F) else Color(0xFF1A1A2E))
+                .background(if (hasPeers) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.error.copy(alpha = 0.1f))
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -381,7 +319,7 @@ private fun NetworkBanner(peerCount: Int, meshActive: Boolean) {
                 // Pulse dot
                 Canvas(modifier = Modifier.size(8.dp)) {
                     drawCircle(
-                        color = if (hasPeers) ColorPeerOnline else Color(0xFFFF9800),
+                        color = if (hasPeers) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         alpha = if (!hasPeers) alpha else 1f
                     )
                 }
@@ -393,7 +331,7 @@ private fun NetworkBanner(peerCount: Int, meshActive: Boolean) {
                         "Scanning for Sawa peers…"
                     else
                         "Mesh offline",
-                    color = if (hasPeers) ColorPeerOnline else Color(0xFFFF9800),
+                    color = if (hasPeers) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -425,14 +363,14 @@ private fun MessageBubble(message: Message) {
                         bottomEnd = if (isMe) 0.dp else 18.dp
                     )
                 )
-                .background(if (isMe) ColorBubbleMe else ColorBubblePeer)
+                .background(if (isMe) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary)
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             Column {
                 if (!isMe && message.senderName != null) {
                     Text(
                         text = message.senderName,
-                        color = ColorPeerOnline,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 2.dp)
@@ -441,7 +379,7 @@ private fun MessageBubble(message: Message) {
                 // Message text
                 Text(
                     text = message.text.parseMarkdown(),
-                    color = ColorTextPrimary,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 14.sp,
                     lineHeight = 20.sp
                 )
@@ -454,7 +392,7 @@ private fun MessageBubble(message: Message) {
                 ) {
                     Text(
                         text = formatTime(message.timestamp),
-                        color = ColorTimestamp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp
                     )
                     if (isMe) {
@@ -472,14 +410,14 @@ private fun MessageStatusIcon(status: Int) {
         STATUS_PENDING -> Icon(
             imageVector = Icons.Filled.Schedule,
             contentDescription = "Pending",
-            tint = ColorTimestamp,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(13.dp)
         )
         STATUS_SENT -> Row {
-            Icon(Icons.Filled.Check, contentDescription = "Sent", tint = ColorTimestamp, modifier = Modifier.size(13.dp))
+            Icon(Icons.Filled.Check, contentDescription = "Sent", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(13.dp))
         }
         STATUS_DELIVERED -> Row {
-            Icon(Icons.Filled.DoneAll, contentDescription = "Delivered", tint = Color(0xFF53BDEB), modifier = Modifier.size(13.dp))
+            Icon(Icons.Filled.DoneAll, contentDescription = "Delivered", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp))
         }
     }
 }
@@ -499,7 +437,7 @@ private fun MessageInputBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ColorBackground)
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.Bottom
@@ -513,14 +451,14 @@ private fun MessageInputBar(
                 .clip(RoundedCornerShape(24.dp))
                 .heightIn(min = 48.dp, max = 120.dp),
             placeholder = {
-                Text("Message", color = ColorTextSecondary, fontSize = 15.sp)
+                Text("Message", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp)
             },
             colors = TextFieldDefaults.colors(
-                focusedContainerColor = ColorInputBg,
-                unfocusedContainerColor = ColorInputBg,
-                focusedTextColor = ColorTextPrimary,
-                unfocusedTextColor = ColorTextPrimary,
-                cursorColor = ColorSendBtn,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                cursorColor = MaterialTheme.colorScheme.primary,
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent
             ),
@@ -532,7 +470,7 @@ private fun MessageInputBar(
         // Send FAB
         FloatingActionButton(
             onClick = { if (canSend) onSend() },
-            containerColor = if (canSend) ColorSendBtn else ColorInputBg,
+            containerColor = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
             shape = CircleShape,
             modifier = Modifier.size(48.dp),
             elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
@@ -540,7 +478,7 @@ private fun MessageInputBar(
             Icon(
                 imageVector = Icons.Rounded.Send,
                 contentDescription = "Send message",
-                tint = if (canSend) Color.White else ColorTextSecondary,
+                tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -557,12 +495,12 @@ private fun DateHeader(timestamp: Long) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF1F2C34))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(horizontal = 12.dp, vertical = 4.dp)
         ) {
             Text(
                 text = formatDate(timestamp),
-                color = ColorTextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium
             )
@@ -582,20 +520,20 @@ private fun EmptyState() {
         Icon(
             imageVector = Icons.Rounded.Wifi,
             contentDescription = null,
-            tint = ColorTextSecondary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(56.dp)
         )
         Spacer(Modifier.height(16.dp))
         Text(
             "No messages yet",
-            color = ColorTextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium
         )
         Spacer(Modifier.height(6.dp))
         Text(
             "Once Sawa peers are in range, messages\nwill appear here automatically.",
-            color = ColorTextSecondary.copy(alpha = 0.6f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             fontSize = 13.sp,
             textAlign = TextAlign.Center,
             lineHeight = 18.sp

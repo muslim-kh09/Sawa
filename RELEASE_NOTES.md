@@ -1,4 +1,5 @@
-- Improved Bluetooth performance and stability
-- Removed App Lock default requirement
-- Added In-App Popups for Direct Messages
-- Added global Markdown support (bold, italic, strikethrough, code)
+- **Enterprise UI Overhaul:** Complete redesign featuring a minimalist, premium layout inspired by modern design standards.
+- **Dynamic Theming Engine:** Full support for elegant Light and Dark modes, with automatic System-default matching and manual override.
+- **Dedicated Settings Hub:** A brand new, clean settings panel replacing clunky dialogs. Manage your Cryptographic Identity, App Lock (Biometrics/PIN), and Appearance in one unified place.
+- **Ergonomic Chat Experience:** Purged distracting neon colors in favor of subtle corporate slate and muted palettes. Action buttons intuitively grouped for single-handed usage.
+- Removed outdated floating elements and bloated layouts, maximizing breathing space and readability across the app.

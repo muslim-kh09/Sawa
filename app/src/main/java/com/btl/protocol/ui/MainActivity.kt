@@ -30,6 +30,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.btl.protocol.data.network.BtlMeshService
 import com.btl.protocol.ui.screens.ChatScreen
 import com.btl.protocol.ui.screens.OnboardingScreen
+import com.btl.protocol.ui.screens.SettingsScreen
 import com.btl.protocol.ui.theme.SawaTheme
 import com.btl.protocol.data.ota.OtaUpdateManager
 import kotlinx.coroutines.launch
@@ -125,7 +126,11 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
-            SawaTheme {
+            val prefs = getSharedPreferences("SawaSettings", Context.MODE_PRIVATE)
+            var themePref by remember { mutableIntStateOf(prefs.getInt("themePref", 0)) }
+            var currentRoute by remember { mutableStateOf("CHAT") }
+
+            SawaTheme(themePreference = themePref) {
                 val pGranted = permissionsGranted
                 val btOn = bluetoothEnabled
 
@@ -138,27 +143,40 @@ class MainActivity : FragmentActivity() {
                         ) {
                             Icon(Icons.Default.Lock, contentDescription = "Locked", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("Sawa is Locked", style = MaterialTheme.typography.headlineMedium)
+                            Text("Sawa is Locked", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
                             Spacer(modifier = Modifier.height(32.dp))
                             Button(onClick = { authenticateUser() }) {
-                                Text("Unlock")
+                                Text("Unlock", color = MaterialTheme.colorScheme.onPrimary)
                             }
                         }
                     }
                 } else if (pGranted && btOn) {
-                    var currentChat by remember { mutableStateOf("PUBLIC") }
-                    androidx.activity.compose.BackHandler(enabled = currentChat != "PUBLIC") {
-                        currentChat = "PUBLIC"
-                    }
-                    ChatScreen(
-                        conversationId = currentChat,
-                        onNavigateToDm = { currentChat = it },
-                        isAppLockEnabled = isAppLockEnabled,
-                        onToggleAppLock = { enabled ->
-                            isAppLockEnabled = enabled
-                            getSharedPreferences("SawaSettings", Context.MODE_PRIVATE).edit().putBoolean("appLockEnabled", enabled).apply()
+                    if (currentRoute == "SETTINGS") {
+                        androidx.activity.compose.BackHandler { currentRoute = "CHAT" }
+                        SettingsScreen(
+                            onNavigateBack = { currentRoute = "CHAT" },
+                            themePreference = themePref,
+                            onThemeChange = { 
+                                themePref = it
+                                prefs.edit().putInt("themePref", it).apply()
+                            },
+                            isAppLockEnabled = isAppLockEnabled,
+                            onToggleAppLock = { enabled ->
+                                isAppLockEnabled = enabled
+                                prefs.edit().putBoolean("appLockEnabled", enabled).apply()
+                            }
+                        )
+                    } else {
+                        var currentChat by remember { mutableStateOf("PUBLIC") }
+                        androidx.activity.compose.BackHandler(enabled = currentChat != "PUBLIC") {
+                            currentChat = "PUBLIC"
                         }
-                    )
+                        ChatScreen(
+                            conversationId = currentChat,
+                            onNavigateToDm = { currentChat = it },
+                            onSettingsClick = { currentRoute = "SETTINGS" }
+                        )
+                    }
                 } else {
                     OnboardingScreen(
                         permissionsGranted = pGranted,
