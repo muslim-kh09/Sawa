@@ -1,0 +1,54 @@
+<resources>
+    <string name="app_name">Sawa</string>
+    
+    <!-- Onboarding -->
+    <string name="init_sequence">Welcome</string>
+    <string name="init_desc">Secure Offline Messaging</string>
+    <string name="init_full_desc">Connect directly with people nearby using Bluetooth. No internet or servers required. Messages are end-to-end encrypted.</string>
+    <string name="step_1_title">Allow Permissions</string>
+    <string name="step_1_desc">Required to discover and connect with nearby devices.</string>
+    <string name="step_1_action">Grant Access</string>
+    <string name="step_2_title">Enable Bluetooth</string>
+    <string name="step_2_desc">Required to send and receive messages offline.</string>
+    <string name="step_2_action">Turn On Bluetooth</string>
+    <string name="security_note">All messages are end-to-end encrypted and sent directly between devices. No data is stored on servers.</string>
+    <string name="status_complete">Completed</string>
+
+    <!-- Chat -->
+    <string name="global_mesh">Public Broadcast</string>
+    <string name="direct_connection">Direct Connection</string>
+    <string name="scanning">Scanning for nearby devices...</string>
+    <string name="mesh_inactive">Network Offline</string>
+    <string name="peers_online">%d online</string>
+    <string name="type_message">Message</string>
+    <string name="no_messages">No messages yet</string>
+    <string name="no_messages_desc">Say hello to people nearby.</string>
+    <string name="active_peers">Active Devices</string>
+    <string name="close">Close</string>
+    <string name="unknown_peer">Unknown Device</string>
+
+    <!-- Conversations -->
+    <string name="mesh_channels">Chats</string>
+    <string name="public_channel">Public Room</string>
+    <string name="encrypted_dm">Encrypted Direct Message</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="appearance">Appearance</string>
+    <string name="security">Security</string>
+    <string name="app_lock">App Lock</string>
+    <string name="identity">Profile</string>
+    <string name="display_name">Display Name</string>
+    <string name="save_name">Save</string>
+    <string name="crypto_fingerprint">Security Fingerprint</string>
+
+    <!-- MainActivity / Lock -->
+    <string name="app_locked">App Locked</string>
+    <string name="authenticate_desc">Verify to access your messages</string>
+    <string name="unlock">Unlock</string>
+    <string name="setup_pin">Setup PIN</string>
+    <string name="enter_pin">Enter PIN</string>
+    <string name="pin_desc_setup">Create a 4-digit code to protect your messages</string>
+    <string name="pin_desc_enter">Enter your 4-digit code</string>
+    <string name="save_pin">Save PIN</string>
+</resources>
