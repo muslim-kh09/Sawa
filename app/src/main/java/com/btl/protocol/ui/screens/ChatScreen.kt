@@ -64,8 +64,6 @@ fun ChatScreen(
     val context = LocalContext.current
     var showEditNameDialog by remember { mutableStateOf(false) }
     var showPeersDialog by remember { mutableStateOf(false) }
-
-    val context = LocalContext.current
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -142,7 +140,7 @@ fun ChatScreen(
                         visible = true,
                         enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it / 2 }) + androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically()
                     ) {
-                        MessageBubble(message = message, modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
+                        MessageBubble(message = message)
                     }
                 }
             }

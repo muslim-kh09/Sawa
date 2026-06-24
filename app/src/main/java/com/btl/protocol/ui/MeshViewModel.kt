@@ -115,7 +115,7 @@ class MeshViewModel @Inject constructor(
             )
             if (rowId == -1L) return@launch
 
-            kotlinx.coroutines.Dispatchers.IO.invoke {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 val compressedBytes = com.btl.protocol.data.network.ImageUtils.processImage(context, uri)
                 if (compressedBytes != null) {
                     val payload = BtlMeshService.buildMediaPayloadStatic(msgId, conversationId, compressedBytes, "image")

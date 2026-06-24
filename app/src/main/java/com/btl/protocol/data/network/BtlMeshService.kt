@@ -636,7 +636,7 @@ class BtlMeshService : Service() {
         // Relay with decremented TTL (Store-Carry-Forward)
         val newTtl = (ttl - 1).toByte()
         if (newTtl > 0) {
-            val relayPayload = buildPayload(senderHex, seq, newTtl, text)
+            val relayPayload = buildPayload(senderHex, seq, newTtl, text.toByteArray(Charsets.UTF_8))
             val otherPeers = peerRegistry.all().filter { it.address != senderAddress }
             otherPeers.forEach { peer ->
                 gattQueue.enqueue(GattWriteOp(device = peer.device, payload = relayPayload))
