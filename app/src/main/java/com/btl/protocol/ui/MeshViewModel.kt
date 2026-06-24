@@ -88,7 +88,7 @@ class MeshViewModel @Inject constructor(
             BtlMeshService.enqueueTransmit(payload, rowId) { success ->
                 viewModelScope.launch {
                     if (success) {
-                        repository.updateStatus(rowId, STATUS_SENT)
+                        repository.updateStatus(rowId, STATUS_DELIVERED)
                         Log.d(TAG, "Message $rowId delivered ✓")
                     } else {
                         Log.w(TAG, "Message $rowId — no peers acknowledged delivery")

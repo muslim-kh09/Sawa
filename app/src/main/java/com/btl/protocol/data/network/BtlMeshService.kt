@@ -96,7 +96,7 @@ class BtlMeshService : Service() {
         fun panicWipe() {
             processedMessageIds.clear()
             peers.value.values.forEach { 
-                try { it.device.connectGatt(null, false, null)?.close() } catch(_: Exception){} 
+                try { it.device.connectGatt(null, false, null, BluetoothDevice.TRANSPORT_LE)?.close() } catch(_: Exception){} 
             }
             // Clear current message queue if possible (not strictly required if app restarts, but good hygiene)
         }
@@ -234,6 +234,8 @@ class BtlMeshService : Service() {
     // Use Unix timestamp as the initial sequence number to prevent replay-attack 
     // drops by peers after the app is restarted.
     private val seqNum = AtomicInteger((System.currentTimeMillis() / 1000).toInt())
+    
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
 
     // ──────────────────────────────────────────────────────────────────────────
     // Lifecycle
@@ -253,6 +255,10 @@ class BtlMeshService : Service() {
             DISPLAY_NAME = "Sawa_" + fingerprint.take(4)
             prefs.edit().putString("displayName", DISPLAY_NAME).apply()
         }
+
+        val powerManager = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        wakeLock = powerManager.newWakeLock(android.os.PowerManager.PARTIAL_WAKELOCK, "Sawa::MeshWakeLock")
+        wakeLock?.acquire()
 
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
@@ -322,6 +328,9 @@ class BtlMeshService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        wakeLock?.let {
+            if (it.isHeld) it.release()
+        }
         liveQueue = null
         livePeers = null
         liveService = null

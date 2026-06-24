@@ -60,6 +60,7 @@ class MainActivity : FragmentActivity() {
     private var permissionsGranted by mutableStateOf(false)
     private var bluetoothEnabled by mutableStateOf(false)
     private var availableUpdate by mutableStateOf<OtaUpdateManager.UpdateInfo?>(null)
+    private var showCustomPinScreen by mutableStateOf(false)
 
     // ──────────────────────────────────────────────────────────────────────────
     // Permission + BT launchers
@@ -135,7 +136,14 @@ class MainActivity : FragmentActivity() {
                 val pGranted = permissionsGranted
                 val btOn = bluetoothEnabled
 
-                if (!appUnlocked) {
+                if (showCustomPinScreen) {
+                    CustomPinScreen(
+                        onAuthenticated = {
+                            showCustomPinScreen = false
+                            appUnlocked = true
+                        }
+                    )
+                } else if (!appUnlocked) {
                     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                         Column(
                             modifier = Modifier.fillMaxSize(),
@@ -202,7 +210,11 @@ class MainActivity : FragmentActivity() {
                         androidx.compose.material3.AlertDialog(
                             onDismissRequest = { availableUpdate = null },
                             title = { androidx.compose.material3.Text("Update Available: v${update.versionName}") },
-                            text = { androidx.compose.material3.Text(update.releaseNotes.parseMarkdown()) },
+                            text = { 
+                                Box(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                                    androidx.compose.material3.Text(update.releaseNotes.parseMarkdown()) 
+                                }
+                            },
                             confirmButton = {
                                 androidx.compose.material3.TextButton(onClick = {
                                     availableUpdate = null
@@ -229,6 +241,12 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun authenticateUser() {
+        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+        if (!keyguardManager.isDeviceSecure) {
+            showCustomPinScreen = true
+            return
+        }
+
         val biometricManager = BiometricManager.from(this)
         val authenticators = if (Build.VERSION.SDK_INT >= 30) {
             BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -336,4 +354,75 @@ object SmartPermissionHandler {
         required().all { permission ->
             context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
         }
+}
+
+@Composable
+fun CustomPinScreen(onAuthenticated: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = context.getSharedPreferences("SawaSettings", Context.MODE_PRIVATE)
+    val savedPinHash = prefs.getString("custom_pin_hash", null)
+    val isSetupMode = savedPinHash == null
+    
+    var pin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = if (isSetupMode) "Set Up App PIN" else "Enter App PIN",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            OutlinedTextField(
+                value = pin,
+                onValueChange = { 
+                    if (it.length <= 4) pin = it 
+                    error = false
+                },
+                isError = error,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword),
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(0.6f),
+                textStyle = LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center, letterSpacing = 8.sp)
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Button(
+                onClick = {
+                    if (pin.length < 4) {
+                        error = true
+                        return@Button
+                    }
+                    val hash = java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(pin.toByteArray())
+                        .joinToString("") { "%02x".format(it) }
+                        
+                    if (isSetupMode) {
+                        prefs.edit().putString("custom_pin_hash", hash).apply()
+                        onAuthenticated()
+                    } else {
+                        if (hash == savedPinHash) {
+                            onAuthenticated()
+                        } else {
+                            error = true
+                            pin = ""
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(0.6f)
+            ) {
+                Text(if (isSetupMode) "Save PIN" else "Unlock")
+            }
+        }
+    }
 }

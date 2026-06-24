@@ -60,7 +60,8 @@ fun ChatScreen(
     var showPeersDialog by remember { mutableStateOf(false) }
 
     // Auto-scroll to the latest message
-    LaunchedEffect(messages.size) {
+    val isImeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    LaunchedEffect(messages.size, isImeVisible) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.lastIndex)
         }
@@ -320,6 +321,10 @@ private fun ChatTopBar(
 @Composable
 private fun MessageBubble(message: Message) {
     val isMe = message.isMe
+    val isDark = isSystemInDarkTheme()
+    val bgColor = if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f)
+    val strokeColor = Color.White.copy(alpha = 0.15f)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -329,14 +334,9 @@ private fun MessageBubble(message: Message) {
         Box(
             modifier = Modifier
                 .widthIn(min = 60.dp, max = 290.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 18.dp, topEnd = 18.dp,
-                        bottomStart = if (isMe) 18.dp else 0.dp,
-                        bottomEnd = if (isMe) 0.dp else 18.dp
-                    )
-                )
-                .background(if (isMe) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary)
+                .clip(RoundedCornerShape(24.dp))
+                .background(bgColor)
+                .border(BorderStroke(1.dp, strokeColor), RoundedCornerShape(24.dp))
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             Column {
