@@ -64,13 +64,15 @@ fun SettingsScreen(
             // Theme Section
             SettingsCard(title = "Appearance", icon = Icons.Default.Palette) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    ThemeOption(modifier = Modifier.weight(1f), label = "System", selected = themePreference == 0) { onThemeChange(0) }
-                    ThemeOption(modifier = Modifier.weight(1f), label = "Light", selected = themePreference == 1) { onThemeChange(1) }
-                    ThemeOption(modifier = Modifier.weight(1f), label = "Dark", selected = themePreference == 2) { onThemeChange(2) }
-                    ThemeOption(modifier = Modifier.weight(1f), label = "AMOLED", selected = themePreference == 3) { onThemeChange(3) }
+                    ThemeOption(label = "System", selected = themePreference == 0) { onThemeChange(0) }
+                    ThemeOption(label = "Light", selected = themePreference == 1) { onThemeChange(1) }
+                    ThemeOption(label = "Dark", selected = themePreference == 2) { onThemeChange(2) }
+                    ThemeOption(label = "AMOLED", selected = themePreference == 3) { onThemeChange(3) }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
@@ -164,7 +166,14 @@ private fun ThemeOption(modifier: Modifier = Modifier, label: String, selected: 
         modifier = modifier,
         selected = selected,
         onClick = onClick,
-        label = { Text(label) },
+        label = { 
+            Text(
+                text = label,
+                maxLines = 1,
+                softWrap = false,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Visible
+            ) 
+        },
         colors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
             selectedLabelColor = MaterialTheme.colorScheme.primary,

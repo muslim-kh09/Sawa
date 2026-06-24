@@ -33,16 +33,11 @@ fun Modifier.glassmorphic(
     val enabled = LocalGlassmorphism.current
     val darkTheme = LocalDarkTheme.current
     if (enabled) {
-        this.background(
-            if (darkTheme) Color.Black.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.15f),
-            shape = RoundedCornerShape(cornerRadius)
-        )
-        .border(
-            0.5.dp,
-            if (darkTheme) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.05f),
-            RoundedCornerShape(cornerRadius)
-        )
-        .clip(RoundedCornerShape(cornerRadius))
+        val bgColor = if (darkTheme) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.55f)
+        val borderColor = if (darkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.05f)
+        this.background(bgColor, shape = RoundedCornerShape(cornerRadius))
+            .border(1.dp, borderColor, RoundedCornerShape(cornerRadius))
+            .clip(RoundedCornerShape(cornerRadius))
     } else {
         this
     }

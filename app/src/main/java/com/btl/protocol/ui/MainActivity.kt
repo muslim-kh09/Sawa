@@ -196,26 +196,28 @@ class MainActivity : FragmentActivity() {
                     )
                 }
 
-                // Show OTA Update Dialog if available
-                availableUpdate?.let { update ->
-                    androidx.compose.material3.AlertDialog(
-                        onDismissRequest = { availableUpdate = null },
-                        title = { androidx.compose.material3.Text("Update Available: v${update.versionName}") },
-                        text = { androidx.compose.material3.Text(update.releaseNotes.parseMarkdown()) },
-                        confirmButton = {
-                            androidx.compose.material3.TextButton(onClick = {
-                                availableUpdate = null
-                                OtaUpdateManager.downloadAndInstall(this@MainActivity, update.downloadUrl)
-                            }) {
-                                androidx.compose.material3.Text("Download & Install")
+                // Show OTA Update Dialog if available and app is unlocked
+                if (appUnlocked) {
+                    availableUpdate?.let { update ->
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { availableUpdate = null },
+                            title = { androidx.compose.material3.Text("Update Available: v${update.versionName}") },
+                            text = { androidx.compose.material3.Text(update.releaseNotes.parseMarkdown()) },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(onClick = {
+                                    availableUpdate = null
+                                    OtaUpdateManager.downloadAndInstall(this@MainActivity, update.downloadUrl)
+                                }) {
+                                    androidx.compose.material3.Text("Download & Install")
+                                }
+                            },
+                            dismissButton = {
+                                androidx.compose.material3.TextButton(onClick = { availableUpdate = null }) {
+                                    androidx.compose.material3.Text("Later")
+                                }
                             }
-                        },
-                        dismissButton = {
-                            androidx.compose.material3.TextButton(onClick = { availableUpdate = null }) {
-                                androidx.compose.material3.Text("Later")
-                            }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -313,18 +315,14 @@ object SmartPermissionHandler {
 
     /** Returns the complete list of permissions required on this API level. */
     fun required(): List<String> = buildList {
-        // Location — required for BLE scanning on all API levels
-        add(Manifest.permission.ACCESS_FINE_LOCATION)
-        add(Manifest.permission.ACCESS_COARSE_LOCATION)
-
-        // Note: BLUETOOTH and BLUETOOTH_ADMIN are install-time on API < 31.
-        // Requesting them at runtime causes SecurityException/IllegalArgumentException on older Android devices.
-
-        // Modern Bluetooth permissions (API 31+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             add(Manifest.permission.BLUETOOTH_SCAN)
             add(Manifest.permission.BLUETOOTH_ADVERTISE)
             add(Manifest.permission.BLUETOOTH_CONNECT)
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
+        } else {
+            // Android 7 to 11: ONLY request ACCESS_FINE_LOCATION at runtime
+            add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
 
         // Notification permission (API 33+)

@@ -1,4 +1,3 @@
-- **API 24 Compatibility:** Resolved fatal initialization crashes on older devices (Android 7) by implementing robust KeyStore software fallbacks where hardware-backed StrongBox is unavailable.
-- **Glassmorphism Layer:** Added a stunning, system-wide togglable Glassmorphism UI layer that introduces frosted glass, translucent alpha blending, and fine borders to active components.
-- **AMOLED Polishing:** Fixed UI element wrapping and structural breaks on smaller devices when using the Pure Black AMOLED mode.
-- **Clean Chat Console:** Removed the clunky network status banner, streamlining the chat view with an elegant pulsing dot indicator right inside the header.
+- **API 24 Compatibility (Permissions):** Fixed Android 7 runtime crash by conditionally omitting `BLUETOOTH_SCAN` and `BLUETOOTH_CONNECT` permissions prior to API 31, ensuring safe legacy booting.
+- **Glassmorphism Rebuilt:** The glass layer is now an authentic mathematical frosted UI, using carefully calculated translucent alphas and fine 1dp borders to dynamically reflect light across Light, Dark, and AMOLED profiles.
+- **Settings UI Polished:** Appearance text buttons in the Settings screen now utilize smooth horizontal scrolling, fully preventing structural text wrapping and overflows.
