@@ -1,3 +1,7 @@
+## v2.1.0
+- **Arabic Language Default:** The app now strictly enforces Arabic language and right-to-left (RTL) layout by default for all users, unless their device is explicitly set to English.
+- **In-App Language Selector:** Added a convenient language toggle directly inside the Settings menu, allowing users to switch between "عربي" and "English" dynamically.
+
 ## v2.0.1
 - **Large Payload Support:** Upgraded the core packet fragmentation engine (`PacketFragmenter`) to use 16-bit indexing, increasing the maximum theoretical payload size to ~720KB (supporting up to 65,535 fragments).
 - **UI Bug Fixes:** Fixed a subtitle formatting bug on the chat screen that displayed a raw string placeholder.
