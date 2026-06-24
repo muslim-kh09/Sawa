@@ -368,14 +368,7 @@ private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
                 
                 // Optional Voice display
                 if (message.mediaUri != null && message.mediaType == "voice") {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-                        Icon(Icons.Rounded.Mic, contentDescription = "Voice Message", tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(8.dp))
-                        Canvas(modifier = Modifier.width(80.dp).height(20.dp)) {
-                            drawLine(color = strokeColor, start = Offset(0f, 10f), end = Offset(80f, 10f), strokeWidth = 3f, cap = StrokeCap.Round)
-                            drawCircle(color = MaterialTheme.colorScheme.primary, radius = 6f, center = Offset(0f, 10f))
-                        }
-                    }
+                    VoiceMessagePlayer(uriString = message.mediaUri, isMe = isMe)
                 }
 
                 if (message.text.isNotEmpty()) {
