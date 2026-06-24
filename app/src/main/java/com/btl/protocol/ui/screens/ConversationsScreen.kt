@@ -1,9 +1,12 @@
 package com.btl.protocol.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Public
@@ -11,8 +14,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.btl.protocol.ui.MeshViewModel
 
@@ -27,32 +32,91 @@ fun ConversationsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Active Mesh Chats", color = Color.White) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF075E54))
+                title = { Text("Active Mesh Chats", style = MaterialTheme.typography.headlineMedium) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                )
             )
         },
-        containerColor = Color(0xFF0D1117)
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        LazyColumn(contentPadding = padding) {
+        LazyColumn(
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = 24.dp, start = 16.dp, end = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             item {
-                ListItem(
-                    headlineContent = { Text("Global Mesh Broadcast", color = Color.White) },
-                    supportingContent = { Text("Public Channel", color = Color.Gray) },
-                    leadingContent = { Icon(Icons.Filled.Public, contentDescription = null, tint = Color.White) },
-                    modifier = Modifier.clickable { onNavigateToChat("PUBLIC") },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                Spacer(Modifier.height(8.dp))
+                ConversationItem(
+                    title = "Global Mesh Broadcast",
+                    subtitle = "Public Channel",
+                    icon = Icons.Filled.Public,
+                    iconColor = MaterialTheme.colorScheme.primary,
+                    onClick = { onNavigateToChat("PUBLIC") }
                 )
-                HorizontalDivider(color = Color.DarkGray)
             }
-            items(peers.values.toList()) { peer ->
-                ListItem(
-                    headlineContent = { Text("Peer: ${peer.address.take(8)}...", color = Color.White) },
-                    supportingContent = { Text("End-to-End Encrypted DM", color = Color(0xFF00A884)) },
-                    leadingContent = { Icon(Icons.Filled.Lock, contentDescription = null, tint = Color(0xFF00A884)) },
-                    modifier = Modifier.clickable { onNavigateToChat(peer.address) },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            
+            items(peers.values.toList(), key = { it.nodeId }) { peer ->
+                ConversationItem(
+                    title = "Peer: ${peer.address.take(8)}...",
+                    subtitle = "End-to-End Encrypted DM",
+                    icon = Icons.Filled.Lock,
+                    iconColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                    onClick = { onNavigateToChat(peer.address) }
                 )
-                HorizontalDivider(color = Color.DarkGray)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConversationItem(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconColor: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .clickable { onClick() },
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(20.dp),
+        shadowElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(iconColor.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

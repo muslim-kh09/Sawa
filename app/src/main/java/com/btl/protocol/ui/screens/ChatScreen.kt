@@ -135,14 +135,14 @@ fun ChatScreen(
                     androidx.compose.animation.AnimatedVisibility(
                         visible = true,
                         enter = androidx.compose.animation.scaleIn(
-                            initialScale = 0.8f,
+                            initialScale = 0.9f,
                             transformOrigin = TransformOrigin(if (message.isMe) 1f else 0f, 1f),
-                            animationSpec = androidx.compose.animation.core.tween(
-                                durationMillis = 700,
-                                easing = androidx.compose.animation.core.CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
                             )
                         ) + androidx.compose.animation.fadeIn(
-                            animationSpec = androidx.compose.animation.core.tween(700, easing = androidx.compose.animation.core.CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
+                            animationSpec = androidx.compose.animation.core.tween(400)
                         )
                     ) {
                         MessageBubble(message = message)
@@ -285,11 +285,10 @@ private fun ChatTopBar(
                         Text(
                             titleText,
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
+                            style = MaterialTheme.typography.titleLarge
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Canvas(modifier = Modifier.size(6.dp)) {
+                        Spacer(Modifier.width(8.dp))
+                        Canvas(modifier = Modifier.size(8.dp)) {
                             drawCircle(
                                 color = if (peerCount > 0 || isDm) primaryColor else errorColor,
                                 alpha = if (peerCount == 0 && !isDm) alpha else 1f
@@ -299,7 +298,7 @@ private fun ChatTopBar(
                     Text(
                         subtitleText,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 13.sp
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
             }
@@ -348,50 +347,45 @@ private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .animateContentSize(animationSpec = tween(600, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))),
+            .padding(vertical = 4.dp)
+            .animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)),
         horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
     ) {
-        // OUTER SHELL (Double-Bezel)
+        // OUTER SHELL
         Box(
             modifier = Modifier
-                .widthIn(min = 60.dp, max = 320.dp)
-                .clip(RoundedCornerShape(32.dp))
+                .widthIn(min = 80.dp, max = 320.dp)
+                .clip(RoundedCornerShape(24.dp))
                 .background(outerBg)
-                .border(1.dp, outerBorder, RoundedCornerShape(32.dp))
-                .padding(6.dp) // Outer gap
+                .border(1.dp, outerBorder, RoundedCornerShape(24.dp))
+                .padding(4.dp) // Outer gap
         ) {
             // INNER CORE
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = if(isDark) 0.2f else 0.1f) else innerBg)
-                    .border(1.dp, if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else innerHighlight, RoundedCornerShape(26.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = if(isDark) 0.15f else 0.1f) else innerBg)
+                    .border(1.dp, if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else innerHighlight, RoundedCornerShape(20.dp))
+                    .padding(horizontal = 18.dp, vertical = 14.dp)
             ) {
                 Column {
                     if (!isMe && message.senderName != null) {
-                        // Eyebrow Tag for Name
                         Text(
                             text = message.senderName.uppercase(),
                             color = MaterialTheme.colorScheme.primary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium,
                             letterSpacing = 0.1.em,
                             modifier = Modifier.padding(bottom = 6.dp)
                         )
                     }
 
                     if (message.text.isNotEmpty()) {
-                        // Message text - Grotesk/Light feel
                         SelectionContainer {
                             Text(
                                 text = message.text.parseMarkdown(),
                                 color = MaterialTheme.colorScheme.onBackground,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.W300,
-                                lineHeight = 22.sp
+                                style = MaterialTheme.typography.bodyLarge
                             )
                         }
                     }
@@ -480,7 +474,7 @@ private fun MessageInputBar(
                     .weight(1f)
                     .heightIn(min = 48.dp, max = 150.dp),
                 placeholder = {
-                    Text("Type a message...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 16.sp, fontWeight = FontWeight.W300)
+                    Text("Type a message...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), style = MaterialTheme.typography.bodyLarge)
                 },
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -492,8 +486,7 @@ private fun MessageInputBar(
                     unfocusedIndicatorColor = Color.Transparent
                 ),
                 maxLines = 6,
-                singleLine = false,
-                textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.W300, lineHeight = 24.sp)
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onBackground)
             )
             Spacer(Modifier.width(8.dp))
             

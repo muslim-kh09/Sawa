@@ -154,12 +154,27 @@ class MainActivity : FragmentActivity() {
                             verticalArrangement = Arrangement.Center,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(Icons.Default.Lock, contentDescription = "Locked", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text("Sawa is Locked", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
-                            Spacer(modifier = Modifier.height(32.dp))
-                            Button(onClick = { authenticateUser() }) {
-                                Text("Unlock", color = MaterialTheme.colorScheme.onPrimary)
+                            Box(
+                                modifier = Modifier
+                                    .size(96.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Lock, contentDescription = "Locked", modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Text("Sawa is Locked", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Authenticate to access your messages", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(48.dp))
+                            Button(
+                                onClick = { authenticateUser() },
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                                contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text("Unlock App", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimary)
                             }
                         }
                     }
@@ -397,14 +412,29 @@ fun CustomPinScreen(onAuthenticated: () -> Unit) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = if (isSetupMode) "Set Up App PIN" else "Enter App PIN",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = if (isSetupMode) "Create a 4-digit PIN to secure your chats." else "Enter your 4-digit PIN to unlock.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(48.dp))
             
             OutlinedTextField(
                 value = pin,
@@ -416,11 +446,18 @@ fun CustomPinScreen(onAuthenticated: () -> Unit) {
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword),
                 visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(0.6f),
-                textStyle = LocalTextStyle.current.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center, letterSpacing = 8.sp)
+                modifier = Modifier.fillMaxWidth(0.7f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                    unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                ),
+                textStyle = MaterialTheme.typography.headlineLarge.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center, letterSpacing = 12.sp)
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             
             Button(
                 onClick = {
@@ -444,9 +481,11 @@ fun CustomPinScreen(onAuthenticated: () -> Unit) {
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth(0.6f)
+                modifier = Modifier.fillMaxWidth(0.7f),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                Text(if (isSetupMode) "Save PIN" else "Unlock")
+                Text(if (isSetupMode) "Save PIN" else "Unlock", style = MaterialTheme.typography.titleMedium)
             }
         }
     }
