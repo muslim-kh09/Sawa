@@ -11,7 +11,7 @@ Sawa is an offline Bluetooth messenger. It lets you send messages without intern
 - Premium Design: Features a pristine iOS-inspired interface with perfectly soft rounded corners, smooth intuitive interactions, and welcoming typography.
 - Localization: Full Arabic language support (RTL compatible).
 
-> **Version:** 2.1.0
+> **Version:** 2.0.2
 > **Note:** This app was coded by AI. It is incomplete and meant for testing purposes only.
 
 ### How to use

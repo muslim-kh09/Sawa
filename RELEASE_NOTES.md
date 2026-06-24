@@ -1,4 +1,4 @@
-## v2.1.0
+## v2.0.2
 - **Arabic Language Default:** The app now strictly enforces Arabic language and right-to-left (RTL) layout by default for all users, unless their device is explicitly set to English.
 - **In-App Language Selector:** Added a convenient language toggle directly inside the Settings menu, allowing users to switch between "عربي" and "English" dynamically.
 

@@ -87,7 +87,7 @@ fun SettingsScreen(
                 val activity = context as? android.app.Activity
                 
                 SettingsRow(
-                    icon = androidx.compose.material.icons.filled.Language,
+                    icon = Icons.Default.Settings,
                     iconBgColor = Color(0xFFFF9500),
                     title = stringResource(R.string.language),
                     content = {
