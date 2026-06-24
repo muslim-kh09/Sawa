@@ -24,6 +24,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.*
 import androidx.compose.ui.text.style.TextAlign
@@ -64,13 +70,6 @@ fun ChatScreen(
     val context = LocalContext.current
     var showEditNameDialog by remember { mutableStateOf(false) }
     var showPeersDialog by remember { mutableStateOf(false) }
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            viewModel.sendImageMessage(context, it, conversationId)
-        }
-    }
 
     // Auto-scroll to the latest message
     val isImeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -107,8 +106,8 @@ fun ChatScreen(
                         viewModel.sendMessage(toSend, conversationId)
                     }
                 },
-                onAttachClick = {
-                    imagePickerLauncher.launch("image/*")
+                onSendVoice = { bytes, uri ->
+                    viewModel.sendVoiceMessage(context, bytes, uri, conversationId)
                 }
             )
         }
@@ -138,7 +137,14 @@ fun ChatScreen(
                 items(messages, key = { it.id }) { message ->
                     androidx.compose.animation.AnimatedVisibility(
                         visible = true,
-                        enter = androidx.compose.animation.slideInVertically(initialOffsetY = { it / 2 }) + androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically()
+                        enter = androidx.compose.animation.scaleIn(
+                            initialScale = 0.8f,
+                            transformOrigin = TransformOrigin(1f, 1f),
+                            animationSpec = androidx.compose.animation.core.spring(
+                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                            )
+                        ) + androidx.compose.animation.fadeIn()
                     ) {
                         MessageBubble(message = message)
                     }
@@ -360,33 +366,28 @@ private fun MessageBubble(message: Message, modifier: Modifier = Modifier) {
                     )
                 }
                 
-                // Optional Media display
-                if (message.mediaUri != null) {
-                    val context = LocalContext.current
-                    val bitmap = remember(message.mediaUri) {
-                        try {
-                            val stream = context.contentResolver.openInputStream(Uri.parse(message.mediaUri))
-                            BitmapFactory.decodeStream(stream)?.asImageBitmap()
-                        } catch (e: Exception) { null }
-                    }
-                    bitmap?.let {
-                        Image(
-                            bitmap = it,
-                            contentDescription = "Shared image",
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp).clip(RoundedCornerShape(8.dp)),
-                            contentScale = androidx.compose.ui.layout.ContentScale.FillWidth
-                        )
+                // Optional Voice display
+                if (message.mediaUri != null && message.mediaType == "voice") {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+                        Icon(Icons.Rounded.Mic, contentDescription = "Voice Message", tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(8.dp))
+                        Canvas(modifier = Modifier.width(80.dp).height(20.dp)) {
+                            drawLine(color = strokeColor, start = Offset(0f, 10f), end = Offset(80f, 10f), strokeWidth = 3f, cap = StrokeCap.Round)
+                            drawCircle(color = MaterialTheme.colorScheme.primary, radius = 6f, center = Offset(0f, 10f))
+                        }
                     }
                 }
 
-                // Message text
-                SelectionContainer {
-                    Text(
-                        text = message.text.parseMarkdown(),
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp
-                    )
+                if (message.text.isNotEmpty()) {
+                    // Message text
+                    SelectionContainer {
+                        Text(
+                            text = message.text.parseMarkdown(),
+                            color = MaterialTheme.colorScheme.onBackground,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp
+                        )
+                    }
                 }
                 Spacer(Modifier.height(4.dp))
                 // Timestamp + status row
@@ -436,9 +437,21 @@ private fun MessageInputBar(
     text: String,
     onTextChange: (String) -> Unit,
     onSend: () -> Unit,
-    onAttachClick: () -> Unit
+    onSendVoice: (ByteArray, Uri) -> Unit
 ) {
     val canSend = text.isNotBlank()
+    val context = LocalContext.current
+    var isRecording by remember { mutableStateOf(false) }
+    var voiceRecorder by remember { mutableStateOf<com.btl.protocol.data.media.VoiceRecorder?>(null) }
+    var voiceFile by remember { mutableStateOf<java.io.File?>(null) }
+    
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            android.widget.Toast.makeText(context, "Microphone permission required for voice messages", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Surface(
         modifier = Modifier
@@ -453,14 +466,6 @@ private fun MessageInputBar(
             modifier = Modifier.padding(end = 4.dp, top = 4.dp, bottom = 4.dp, start = 8.dp),
             verticalAlignment = Alignment.Bottom
         ) {
-            IconButton(onClick = onAttachClick) {
-                Icon(
-                    Icons.Rounded.Add,
-                    contentDescription = "Attach",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-            
             TextField(
                 value = text,
                 onValueChange = onTextChange,
@@ -484,20 +489,65 @@ private fun MessageInputBar(
                 textStyle = LocalTextStyle.current.copy(fontSize = 15.sp)
             )
             Spacer(Modifier.width(4.dp))
-            // Send FAB
-            FloatingActionButton(
-                onClick = { if (canSend) onSend() },
-                containerColor = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                shape = CircleShape,
-                modifier = Modifier.size(48.dp),
-                elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Send,
-                    contentDescription = "Send message",
-                    tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
+            if (canSend) {
+                // Send text FAB
+                FloatingActionButton(
+                    onClick = { onSend() },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    shape = CircleShape,
+                    modifier = Modifier.size(48.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Send,
+                        contentDescription = "Send message",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else {
+                // Voice record FAB
+                val recordColor by animateColorAsState(if (isRecording) Color.Red else MaterialTheme.colorScheme.surfaceVariant)
+                val recordScale by animateFloatAsState(if (isRecording) 1.2f else 1f)
+                
+                FloatingActionButton(
+                    onClick = {},
+                    containerColor = recordColor,
+                    shape = CircleShape,
+                    modifier = Modifier.size(48.dp).scale(recordScale).pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                    return@detectTapGestures
+                                }
+                                isRecording = true
+                                voiceRecorder = com.btl.protocol.data.media.VoiceRecorder(context)
+                                voiceFile = voiceRecorder?.startRecording()
+                                try { awaitRelease() } finally {
+                                    isRecording = false
+                                    val bytes = voiceRecorder?.stopRecording()
+                                    if (bytes != null && voiceFile != null) {
+                                        val uri = FileProvider.getUriForFile(
+                                            context,
+                                            context.packageName + ".fileprovider",
+                                            voiceFile!!
+                                        )
+                                        onSendVoice(bytes, uri)
+                                    }
+                                }
+                            }
+                        )
+                    },
+                    elevation = FloatingActionButtonDefaults.elevation(if (isRecording) 8.dp else 0.dp, 0.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Mic,
+                        contentDescription = "Hold to record",
+                        tint = if (isRecording) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }

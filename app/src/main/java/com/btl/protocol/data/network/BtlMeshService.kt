@@ -502,8 +502,9 @@ class BtlMeshService : Service() {
                     val packet = BinaryProtocol.decode(binaryData)
                     if (packet != null) {
                         val mediaType = if (packet.type == 2.toByte()) "image" else "voice"
+                        val ext = if (mediaType == "image") ".jpg" else ".amr"
                         try {
-                            val file = java.io.File(applicationContext.filesDir, "$msgId.jpg")
+                            val file = java.io.File(applicationContext.filesDir, "$msgId$ext")
                             java.io.FileOutputStream(file).use { it.write(packet.payload) }
                             val uri = androidx.core.content.FileProvider.getUriForFile(
                                 applicationContext,
@@ -514,7 +515,7 @@ class BtlMeshService : Service() {
                                 com.btl.protocol.data.repository.Message(
                                     messageId = msgId,
                                     isMe = false,
-                                    text = "📷 Image",
+                                    text = "",
                                     timestamp = packet.timestamp,
                                     senderName = dName,
                                     conversationId = convId,
@@ -522,7 +523,7 @@ class BtlMeshService : Service() {
                                     mediaType = mediaType
                                 )
                             )
-                            showDmNotification(dName, "Sent an image")
+                            showDmNotification(dName, if (mediaType == "voice") "Sent a voice message" else "Sent an image")
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed to save media", e)
                         }
