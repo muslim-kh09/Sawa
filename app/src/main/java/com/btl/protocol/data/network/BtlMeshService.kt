@@ -621,13 +621,13 @@ class BtlMeshService : Service() {
                 meshRepository.addMessage(
                     Message(messageId = msgId, isMe = false, text = cleanedText, status = STATUS_DELIVERED, senderName = dName, conversationId = sId)
                 )
-                Log.i(TAG, "✉ Delivered DM from mesh: "$cleanedText" from $dName")
+                Log.i(TAG, "✉ Delivered DM from mesh: \"$cleanedText\" from $dName")
                 showDmNotification(dName, cleanedText)
             } else if (!isForSomeoneElse) {
                 meshRepository.addMessage(
                     Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = dName, conversationId = "PUBLIC")
                 )
-                Log.i(TAG, "✉ Delivered public message from mesh: "$actualText" from $dName")
+                Log.i(TAG, "✉ Delivered public message from mesh: \"$actualText\" from $dName")
             } else {
                 Log.i(TAG, "✉ Relaying DM intended for another peer.")
             }
@@ -643,7 +643,7 @@ class BtlMeshService : Service() {
             meshRepository.addMessage(
                 Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = "Unknown")
             )
-            Log.i(TAG, "✉ Delivered message from mesh: "$actualText"")
+            Log.i(TAG, "✉ Delivered message from mesh: \"$actualText\"")
         } else {
             Log.w(TAG, "Malformed TYPE_CHAT packet dropped silently.")
         }
