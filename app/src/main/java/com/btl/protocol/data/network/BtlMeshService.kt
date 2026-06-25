@@ -598,7 +598,7 @@ class BtlMeshService : Service() {
 
             val convIdPrefix = "[$LOCAL_DEVICE_ID] "
             val isForMe = actualText.startsWith(convIdPrefix)
-            val isForSomeoneElse = actualText.matches(Regex("^\[[a-fA-F0-9]{16}\] .*"))
+            val isForSomeoneElse = actualText.matches(Regex("^\\[[a-fA-F0-9]{16}\\] .*"))
 
             if (isForMe) {
                 var cleanedText = actualText.removePrefix(convIdPrefix)
