@@ -96,11 +96,7 @@ class BtlMeshService : Service() {
         }
 
         /** Tracks seen message UUIDs to deduplicate echoes from the broadcast mesh. */
-        val packetCache = java.util.Collections.synchronizedMap(
-            object : java.util.LinkedHashMap<String, Boolean>(500, 0.75f, true) {
-                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>) = size > 500
-            }
-        )
+        val packetCache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
 
         /** PANIC MODE: Clears all in-memory state. */
         fun panicWipe() {
@@ -164,10 +160,11 @@ class BtlMeshService : Service() {
          * Returns null if the service is not currently running.
          */
         fun buildPayloadStatic(text: String, msgId: String = java.util.UUID.randomUUID().toString(), conversationId: String = "PUBLIC"): ByteArray? {
+            if (packetCache.size > 1000) packetCache.clear()
             packetCache.put(msgId, true)
             
             val finalString = if (conversationId != "PUBLIC") {
-                val recipientNodeId = conversationId.take(8)
+                val recipientNodeId = conversationId
                 val recipientPubKey = _knownIdentities.value[recipientNodeId]?.pubKey
                 if (recipientPubKey != null) {
                     val encrypted = liveService?.identityManager?.encryptMessage(recipientPubKey, text)
@@ -184,6 +181,7 @@ class BtlMeshService : Service() {
         } 
 
         fun buildMediaPayloadStatic(msgId: String, conversationId: String, mediaBytes: ByteArray, mediaType: String): ByteArray? {
+            if (packetCache.size > 1000) packetCache.clear()
             packetCache.put(msgId, true)
             
             val packet = BinaryProtocol.Packet(
@@ -333,7 +331,7 @@ class BtlMeshService : Service() {
                 if (_meshActive.value) {
                     val peers = peerRegistry.allDirect()
                     if (peers.isNotEmpty()) {
-                        val gossipData = peers.joinToString(";") { "${it.nodeId},${it.meshName ?: "Unknown"}" }
+                        val gossipData = peers.joinToString(";") { "${it.nodeId},${_knownIdentities.value[it.nodeId]?.displayName ?: "Unknown"}" }
                         val payload = buildOutgoingPayload(gossipData, TYPE_ROUTING_TABLE)
                         val queue = liveQueue
                         if (queue != null) {
@@ -493,6 +491,7 @@ class BtlMeshService : Service() {
      */
     private suspend fun handleIncomingPayload(senderAddress: String, payload: ByteArray) {
         markTraffic()
+        try {
         // Format: [senderHashHex: 64 ASCII chars] [seqNum: 4 bytes BE] [ttl: 1 byte] [type: 1 byte] [utf8Text...]
         if (payload.size < 70) {
             Log.w(TAG, "Payload too short (${payload.size} bytes) from $senderAddress")
@@ -512,6 +511,7 @@ class BtlMeshService : Service() {
             Log.d(TAG, "Dropped duplicate packet $packetId (LRU Cache)")
             return
         }
+        if (packetCache.size > 1000) packetCache.clear()
         packetCache.put(packetId, true)
 
         if (type == TYPE_ROUTING_TABLE) {
@@ -583,7 +583,8 @@ class BtlMeshService : Service() {
                 if (sId == LOCAL_DEVICE_ID) return
                 updateIdentity(sId, dName)
                 if (packetCache.containsKey(msgId)) return
-                packetCache.put(msgId, true)
+                if (packetCache.size > 1000) packetCache.clear()
+            packetCache.put(msgId, true)
                 
                 val binaryData = rawData.copyOfRange(nullIndex + 1, rawData.size)
                 if (binaryData.isNotEmpty() && binaryData[0] == BinaryProtocol.VERSION) {
@@ -640,6 +641,7 @@ class BtlMeshService : Service() {
             if (sId == LOCAL_DEVICE_ID) return // drop self-echo
             updateIdentity(sId, dName)
             if (packetCache.containsKey(msgId)) return
+            if (packetCache.size > 1000) packetCache.clear()
             packetCache.put(msgId, true)
 
             val convIdPrefix = "[$LOCAL_DEVICE_ID] "
@@ -650,7 +652,7 @@ class BtlMeshService : Service() {
                 var cleanedText = actualText.removePrefix(convIdPrefix)
                 if (cleanedText.startsWith("E2E:")) {
                     val encryptedB64 = cleanedText.removePrefix("E2E:")
-                    val senderNodeId = sId.take(8)
+                    val senderNodeId = sId
                     val senderPubKey = _knownIdentities.value[senderNodeId]?.pubKey
                     if (senderPubKey != null) {
                         val decrypted = identityManager.decryptMessage(senderPubKey, encryptedB64)
@@ -684,6 +686,7 @@ class BtlMeshService : Service() {
             
             if (sId == LOCAL_DEVICE_ID) return // drop self-echo
             if (packetCache.containsKey(msgId)) return
+            if (packetCache.size > 1000) packetCache.clear()
             packetCache.put(msgId, true)
 
             meshRepository.addMessage(
@@ -824,9 +827,9 @@ class BtlMeshService : Service() {
     }
 
     private fun buildPayload(senderHex: String, seq: Int, ttl: Byte, type: Byte, textBytes: ByteArray): ByteArray {
-        val senderBytes = senderHex.toByteArray(Charsets.US_ASCII)  // 64 bytes
-        return ByteArray(senderBytes.size + 4 + 1 + 1 + textBytes.size).also { buf ->
-            senderBytes.copyInto(buf, 0)
+        val senderBytes = senderHex.toByteArray(Charsets.US_ASCII)
+        return ByteArray(64 + 4 + 1 + 1 + textBytes.size).also { buf ->
+            senderBytes.copyInto(buf, 0, 0, minOf(64, senderBytes.size))
             buf[64] = ((seq shr 24) and 0xFF).toByte()
             buf[65] = ((seq shr 16) and 0xFF).toByte()
             buf[66] = ((seq shr 8) and 0xFF).toByte()
