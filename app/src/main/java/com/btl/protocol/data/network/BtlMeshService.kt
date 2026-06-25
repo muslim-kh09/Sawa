@@ -468,9 +468,8 @@ class BtlMeshService : Service() {
      */
     private suspend fun handleIncomingPayload(senderAddress: String, payload: ByteArray) {
         markTraffic()
-        // Simple wire format for this implementation:
-        // [senderHashHex: 64 ASCII chars] [seqNum: 4 bytes BE] [ttl: 1 byte] [utf8Text...]
-        if (payload.size < 69) {
+        // Format: [senderHashHex: 64 ASCII chars] [seqNum: 4 bytes BE] [ttl: 1 byte] [type: 1 byte] [utf8Text...]
+        if (payload.size < 70) {
             Log.w(TAG, "Payload too short (${payload.size} bytes) from $senderAddress")
             return
         }
@@ -480,7 +479,8 @@ class BtlMeshService : Service() {
                   ((payload[66].toInt() and 0xFF) shl 8) or
                    (payload[67].toInt() and 0xFF)
         val ttl = payload[68]
-        val text = String(payload, 69, payload.size - 69, Charsets.UTF_8)
+        val type = payload[69]
+        val text = String(payload, 70, payload.size - 70, Charsets.UTF_8)
 
         val isNew = routingEngine.processIncomingPacket(senderHex, seq, ttl, payload)
         if (!isNew) {
@@ -488,8 +488,50 @@ class BtlMeshService : Service() {
             return
         }
 
-        // --- Binary Media Parser ---
-        val rawData = payload.copyOfRange(69, payload.size)
+        // Relay with decremented TTL (Store-Carry-Forward)
+        val newTtl = (ttl - 1).toByte()
+        if (newTtl > 0) {
+            val relayPayload = buildPayload(senderHex, seq, newTtl, type, text.toByteArray(Charsets.UTF_8))
+            val otherPeers = peerRegistry.all().filter { it.address != senderAddress }
+            otherPeers.forEach { peer ->
+                gattQueue.enqueue(GattWriteOp(device = peer.device, payload = relayPayload))
+            }
+            Log.d(TAG, "Relayed packet to ${otherPeers.size} peers (TTL=$newTtl)")
+        }
+
+        // --- Vector Sync Anti-Entropy / Discovery Logic ---
+        if (type == TYPE_SYNC || type == TYPE_DISCOVERY) {
+            if (text.startsWith("SYNC|")) {
+                val parts = text.split("|")
+                if (parts.size >= 4) {
+                    val pubKey = if (parts.size >= 5) parts[4] else null
+                    updateIdentity(parts[2], parts[3], pubKey)
+                }
+                val remoteIds = parts[1].split(",")
+                val localIds = meshRepository.getAllMessageIds()
+                val missingInRemote = localIds.filter { it !in remoteIds }.takeLast(5)
+                
+                val peerDevice = peerRegistry.all().find { it.address == senderAddress }?.device ?: return
+                missingInRemote.forEach { missingId ->
+                    val msg = meshRepository.getMessageById(missingId)
+                    if (msg != null) {
+                        val finalText = if (msg.conversationId != "PUBLIC") "[${msg.conversationId}] ${msg.text}" else msg.text
+                        val relayText = "${msg.messageId}|$LOCAL_DEVICE_ID|${msg.senderName ?: "Unknown"}|$finalText"
+                        val relayPayload = buildOutgoingPayload(relayText, TYPE_CHAT)
+                        gattQueue.enqueue(GattWriteOp(device = peerDevice, payload = relayPayload))
+                    }
+                }
+            }
+            return // Route ends here for internal packets! No UI leakage.
+        }
+
+        if (type != TYPE_CHAT) {
+            Log.w(TAG, "Dropped unhandled packet type: $type")
+            return
+        }
+
+        // --- Binary Media Parser (Only for TYPE_CHAT) ---
+        val rawData = payload.copyOfRange(70, payload.size)
         val nullIndex = rawData.indexOfFirst { it == 0.toByte() }
         if (nullIndex != -1) {
             val prefix = String(rawData, 0, nullIndex, Charsets.UTF_8)
@@ -541,31 +583,6 @@ class BtlMeshService : Service() {
             }
         }
 
-        // --- Vector Sync Anti-Entropy Logic ---
-        if (text.startsWith("SYNC|")) {
-            val parts = text.split("|")
-            if (parts.size >= 4) {
-                val pubKey = if (parts.size >= 5) parts[4] else null
-                updateIdentity(parts[2], parts[3], pubKey)
-            }
-            val remoteIds = parts[1].split(",")
-            val localIds = meshRepository.getAllMessageIds()
-            // Sync up to 5 missing messages to avoid flooding
-            val missingInRemote = localIds.filter { it !in remoteIds }.takeLast(5)
-            
-            val peerDevice = peerRegistry.all().find { it.address == senderAddress }?.device ?: return
-            missingInRemote.forEach { missingId ->
-                val msg = meshRepository.getMessageById(missingId)
-                if (msg != null) {
-                    val finalText = if (msg.conversationId != "PUBLIC") "[${msg.conversationId}] ${msg.text}" else msg.text
-                    val relayText = "${msg.messageId}|$LOCAL_DEVICE_ID|${msg.senderName ?: "Unknown"}|$finalText"
-                    val relayPayload = buildOutgoingPayload(relayText)
-                    gattQueue.enqueue(GattWriteOp(device = peerDevice, payload = relayPayload))
-                }
-            }
-            return
-        }
-
         // Deduplication and Self-echo drop
         val parts = text.split("|", limit = 4)
         if (parts.size == 4) {
@@ -579,16 +596,12 @@ class BtlMeshService : Service() {
             if (processedMessageIds.contains(msgId)) return
             processedMessageIds.add(msgId)
 
-            // Extract conversationId from text if it's a DM
             val convIdPrefix = "[$LOCAL_DEVICE_ID] "
             val isForMe = actualText.startsWith(convIdPrefix)
-            val isForSomeoneElse = actualText.matches(Regex("^\\[[a-fA-F0-9]{16}\\] .*"))
+            val isForSomeoneElse = actualText.matches(Regex("^\[[a-fA-F0-9]{16}\] .*"))
 
             if (isForMe) {
-                // It's a DM directed to me
                 var cleanedText = actualText.removePrefix(convIdPrefix)
-                
-                // Attempt E2EE Decryption
                 if (cleanedText.startsWith("E2E:")) {
                     val encryptedB64 = cleanedText.removePrefix("E2E:")
                     val senderNodeId = sId.take(8)
@@ -608,17 +621,14 @@ class BtlMeshService : Service() {
                 meshRepository.addMessage(
                     Message(messageId = msgId, isMe = false, text = cleanedText, status = STATUS_DELIVERED, senderName = dName, conversationId = sId)
                 )
-                Log.i(TAG, "✉ Delivered DM from mesh: \"$cleanedText\" from $dName")
+                Log.i(TAG, "✉ Delivered DM from mesh: "$cleanedText" from $dName")
                 showDmNotification(dName, cleanedText)
             } else if (!isForSomeoneElse) {
-                // It's a PUBLIC message
                 meshRepository.addMessage(
                     Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = dName, conversationId = "PUBLIC")
                 )
-                Log.i(TAG, "✉ Delivered public message from mesh: \"$actualText\" from $dName")
+                Log.i(TAG, "✉ Delivered public message from mesh: "$actualText" from $dName")
             } else {
-                // It's a DM for someone else. Store it for relaying, but don't show it in our UI.
-                // Or we can just drop UI delivery, but keep it in processedMessageIds so we relay it via SCF.
                 Log.i(TAG, "✉ Relaying DM intended for another peer.")
             }
         } else if (parts.size == 3) {
@@ -633,24 +643,9 @@ class BtlMeshService : Service() {
             meshRepository.addMessage(
                 Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = "Unknown")
             )
-            Log.i(TAG, "✉ Delivered message from mesh: \"$actualText\"")
+            Log.i(TAG, "✉ Delivered message from mesh: "$actualText"")
         } else {
-            // Legacy plaintext
-            meshRepository.addMessage(
-                Message(messageId = java.util.UUID.randomUUID().toString(), isMe = false, text = text, status = STATUS_DELIVERED)
-            )
-            Log.i(TAG, "✉ Delivered message from mesh: \"$text\"")
-        }
-
-        // Relay with decremented TTL (Store-Carry-Forward)
-        val newTtl = (ttl - 1).toByte()
-        if (newTtl > 0) {
-            val relayPayload = buildPayload(senderHex, seq, newTtl, text.toByteArray(Charsets.UTF_8))
-            val otherPeers = peerRegistry.all().filter { it.address != senderAddress }
-            otherPeers.forEach { peer ->
-                gattQueue.enqueue(GattWriteOp(device = peer.device, payload = relayPayload))
-            }
-            Log.d(TAG, "Relayed packet to ${otherPeers.size} peers (TTL=$newTtl)")
+            Log.w(TAG, "Malformed TYPE_CHAT packet dropped silently.")
         }
     }
 
