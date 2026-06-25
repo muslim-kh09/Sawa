@@ -367,10 +367,10 @@ private fun MessageInputBar(
             ) {
                 TextField(
                     value = text,
-                    onValueChange = onTextChange,
+                    onValueChange = { if (it.length <= 1500) onTextChange(it) },
                     modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp, max = 150.dp),
                     placeholder = {
-                        Text(stringResource(R.string.type_message), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.type_message) + " (Max 1500 chars)", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     },
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,

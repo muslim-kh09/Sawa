@@ -21,3 +21,6 @@ Sawa is an offline Bluetooth messenger. It lets you send messages without intern
 
 ### How to use
 Open the app, give it Bluetooth and Location permissions, and start chatting. Anyone with the app nearby will receive your messages.
+
+### Website
+Official Website: [https://muslim-kh09.github.io/sawa-web/](https://muslim-kh09.github.io/sawa-web/)

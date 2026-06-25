@@ -42,10 +42,12 @@ object PacketFragmenter {
 
         val msgId = msgIdGen.incrementAndGet()
 
-        val chunks: List<ByteArray> = if (payload.size <= chunkSize) {
-            listOf(payload)
-        } else {
-            payload.toList().chunked(chunkSize).map { it.toByteArray() }
+        val chunks = mutableListOf<ByteArray>()
+        var offset = 0
+        while (offset < payload.size) {
+            val end = minOf(offset + chunkSize, payload.size)
+            chunks.add(payload.copyOfRange(offset, end))
+            offset = end
         }
 
         val total = chunks.size.coerceAtMost(65535).toShort()
