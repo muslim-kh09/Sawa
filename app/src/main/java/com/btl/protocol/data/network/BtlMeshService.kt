@@ -77,6 +77,7 @@ class BtlMeshService : Service() {
         private const val BROADCAST_TTL: Byte = 7
 
         const val TYPE_CHAT: Byte = 0x01
+        const val TYPE_ROUTING_TABLE: Byte = 0x03
         const val TYPE_SYNC: Byte = 0x02
         const val TYPE_DISCOVERY: Byte = 0x03
 
@@ -95,11 +96,15 @@ class BtlMeshService : Service() {
         }
 
         /** Tracks seen message UUIDs to deduplicate echoes from the broadcast mesh. */
-        val processedMessageIds = mutableSetOf<String>()
+        val packetCache = java.util.Collections.synchronizedMap(
+            object : java.util.LinkedHashMap<String, Boolean>(500, 0.75f, true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>) = size > 500
+            }
+        )
 
         /** PANIC MODE: Clears all in-memory state. */
         fun panicWipe() {
-            processedMessageIds.clear()
+            packetCache.clear()
             peers.value.values.forEach { 
                 try { it.device.connectGatt(null, false, null, BluetoothDevice.TRANSPORT_LE)?.close() } catch(_: Exception){} 
             }
@@ -159,7 +164,7 @@ class BtlMeshService : Service() {
          * Returns null if the service is not currently running.
          */
         fun buildPayloadStatic(text: String, msgId: String = java.util.UUID.randomUUID().toString(), conversationId: String = "PUBLIC"): ByteArray? {
-            processedMessageIds.add(msgId)
+            packetCache.put(msgId, true)
             
             val finalString = if (conversationId != "PUBLIC") {
                 val recipientNodeId = conversationId.take(8)
@@ -179,7 +184,7 @@ class BtlMeshService : Service() {
         } 
 
         fun buildMediaPayloadStatic(msgId: String, conversationId: String, mediaBytes: ByteArray, mediaType: String): ByteArray? {
-            processedMessageIds.add(msgId)
+            packetCache.put(msgId, true)
             
             val packet = BinaryProtocol.Packet(
                 type = if (mediaType == "image") 2 else 3,
@@ -219,7 +224,7 @@ class BtlMeshService : Service() {
                 onResult(false)
                 return
             }
-            val peers = livePeers?.all() ?: emptyList()
+            val peers = livePeers?.allDirect() ?: emptyList()
             if (peers.isEmpty()) {
                 Log.w(TAG, "No peers to transmit to")
                 onResult(false)
@@ -230,7 +235,7 @@ class BtlMeshService : Service() {
             peers.forEach { peer ->
                 queue.enqueue(
                     GattWriteOp(
-                        device = peer.device,
+                        device = peer.device!!,
                         payload = payload,
                         messageId = messageId.toInt()
                     ) { success ->
@@ -302,15 +307,7 @@ class BtlMeshService : Service() {
         bluetoothAdapter = bluetoothManager.adapter
 
         peerRegistry = PeerRegistry(serviceScope)
-        gattQueue = GattOperationQueue(this, serviceScope).apply {
-            onQueueActiveChanged = { isActive ->
-                if (isActive) {
-                    stopScanning()
-                } else {
-                    if (_meshActive.value) startScanning()
-                }
-            }
-        }
+        gattQueue = GattOperationQueue(this, serviceScope)
 
         liveQueue = gattQueue
         livePeers = peerRegistry
@@ -329,6 +326,26 @@ class BtlMeshService : Service() {
             }
         }
 
+        // Gossip Protocol (Distant Node Discovery)
+        serviceScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(60_000L)
+                if (_meshActive.value) {
+                    val peers = peerRegistry.allDirect()
+                    if (peers.isNotEmpty()) {
+                        val gossipData = peers.joinToString(";") { "${it.nodeId},${it.meshName ?: "Unknown"}" }
+                        val payload = buildOutgoingPayload(gossipData, TYPE_ROUTING_TABLE)
+                        val queue = liveQueue
+                        if (queue != null) {
+                            peers.forEach { peer ->
+                                queue.enqueue(GattWriteOp(device = peer.device!!, payload = payload))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Active Mesh Anti-Entropy (Vector Clock Sync)
         serviceScope.launch {
             while (true) {
@@ -343,7 +360,7 @@ class BtlMeshService : Service() {
                     val live = liveQueue
                     if (live != null) {
                         peerRegistry.all().forEach { peer ->
-                            live.enqueue(GattWriteOp(device = peer.device, payload = payload))
+                            live.enqueue(GattWriteOp(device = peer.device!!, payload = payload))
                         }
                     }
                 }
@@ -490,21 +507,34 @@ class BtlMeshService : Service() {
         val type = payload[69]
         val text = String(payload, 70, payload.size - 70, Charsets.UTF_8)
 
-        val isNew = routingEngine.processIncomingPacket(senderHex, seq, ttl, payload)
-        if (!isNew) {
-            Log.d(TAG, "Dropped duplicate/expired packet $senderHex-$seq")
+        val packetId = "$senderHex-$seq"
+        if (packetCache.containsKey(packetId)) {
+            Log.d(TAG, "Dropped duplicate packet $packetId (LRU Cache)")
             return
         }
+        packetCache.put(packetId, true)
 
-        // Relay with decremented TTL (Store-Carry-Forward)
-        val newTtl = (ttl - 1).toByte()
-        if (newTtl > 0) {
-            val relayPayload = buildPayload(senderHex, seq, newTtl, type, text.toByteArray(Charsets.UTF_8))
-            val otherPeers = peerRegistry.all().filter { it.address != senderAddress }
-            otherPeers.forEach { peer ->
-                gattQueue.enqueue(GattWriteOp(device = peer.device, payload = relayPayload))
+        if (type == TYPE_ROUTING_TABLE) {
+            val entries = text.split(";")
+            entries.forEach { entry ->
+                val p = entry.split(",")
+                if (p.size == 2) {
+                    val id = p[0]
+                    val name = p[1]
+                    if (id != LOCAL_DEVICE_ID) {
+                        peerRegistry.seenMesh(id, name)
+                    }
+                }
             }
-            Log.d(TAG, "Relayed packet to ${otherPeers.size} peers (TTL=$newTtl)")
+            // Relay gossip table
+            val newTtl = (ttl - 1).toByte()
+            if (newTtl > 0) {
+                val relayPayload = buildPayload(senderHex, seq, newTtl, type, text.toByteArray(Charsets.UTF_8))
+                peerRegistry.allDirect().filter { it.address != senderAddress }.forEach { peer ->
+                    gattQueue.enqueue(GattWriteOp(device = peer.device!!, payload = relayPayload))
+                }
+            }
+            return
         }
 
         // --- Vector Sync Anti-Entropy / Discovery Logic ---
@@ -552,8 +582,8 @@ class BtlMeshService : Service() {
                 
                 if (sId == LOCAL_DEVICE_ID) return
                 updateIdentity(sId, dName)
-                if (processedMessageIds.contains(msgId)) return
-                processedMessageIds.add(msgId)
+                if (packetCache.containsKey(msgId)) return
+                packetCache.put(msgId, true)
                 
                 val binaryData = rawData.copyOfRange(nullIndex + 1, rawData.size)
                 if (binaryData.isNotEmpty() && binaryData[0] == BinaryProtocol.VERSION) {
@@ -587,6 +617,14 @@ class BtlMeshService : Service() {
                         }
                     }
                 }
+                
+                val newTtl = (ttl - 1).toByte()
+                if (newTtl > 0) {
+                    val relayPayload = buildPayload(senderHex, seq, newTtl, type, payload.copyOfRange(70, payload.size))
+                    peerRegistry.allDirect().filter { it.address != senderAddress }.forEach { peer ->
+                        gattQueue.enqueue(GattWriteOp(device = peer.device!!, payload = relayPayload))
+                    }
+                }
                 return
             }
         }
@@ -601,8 +639,8 @@ class BtlMeshService : Service() {
             
             if (sId == LOCAL_DEVICE_ID) return // drop self-echo
             updateIdentity(sId, dName)
-            if (processedMessageIds.contains(msgId)) return
-            processedMessageIds.add(msgId)
+            if (packetCache.containsKey(msgId)) return
+            packetCache.put(msgId, true)
 
             val convIdPrefix = "[$LOCAL_DEVICE_ID] "
             val isForMe = actualText.startsWith(convIdPrefix)
@@ -645,8 +683,8 @@ class BtlMeshService : Service() {
             val actualText = parts[2]
             
             if (sId == LOCAL_DEVICE_ID) return // drop self-echo
-            if (processedMessageIds.contains(msgId)) return
-            processedMessageIds.add(msgId)
+            if (packetCache.containsKey(msgId)) return
+            packetCache.put(msgId, true)
 
             meshRepository.addMessage(
                 Message(messageId = msgId, isMe = false, text = actualText, status = STATUS_DELIVERED, senderName = "Unknown")

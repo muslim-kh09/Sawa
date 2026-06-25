@@ -1,4 +1,9 @@
-## v2.0.4
+## v2.0.5
+- **Multi-hop Relaying Engine:** Devices now actively act as bridges for packets not intended for them, allowing users to communicate over vast physical distances by routing through intermediate nodes.
+- **Gossip Protocol:** The mesh now actively discovers and syncs routing tables with distant nodes. The UI visually distinguishes between Directly Connected Peers (1 hop) and Mesh Peers (2+ hops).
+- **Broadcast Storm Mitigation:** Implemented strict Time-To-Live (TTL) decrements on all outbound packets and a high-speed LRU Deduplication cache to prevent infinite network flood loops in high-density deployments like stadiums.
+
+
 - **BitChat Pacing & Stability:** Incorporated the official BitChat iOS logic to pause background BLE scanning during large transfers to eliminate radio time-multiplexing drops, and introduced lightweight buffer draining delays.
 - **Dynamic BLE Timeouts:** Replaced the global rigid GATT timeout with a dynamic duration scaled based on payload chunk size, guaranteeing large offline files won't prematurely terminate.
 - **Safe MTU Discovery:** Enforced safe MTU transmission tracking, preventing large packets from being silently dropped by strictly matching the receiver's negotiated capabilities.

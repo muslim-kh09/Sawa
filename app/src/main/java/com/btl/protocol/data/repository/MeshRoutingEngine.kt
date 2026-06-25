@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 const val STATUS_PENDING = 0    // Inserted locally, not yet transmitted
 const val STATUS_SENT = 1       // GATT write acknowledged by peer
 const val STATUS_DELIVERED = 2  // Message confirmed received (for future ACK protocol)
+const val STATUS_FAILED = 3     // Failed to send after retries
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Room Entities
@@ -104,6 +105,9 @@ interface MessageDao {
 
     @Query("SELECT messageId FROM messages")
     suspend fun getAllMessageIds(): List<String>
+    
+    @Query("SELECT * FROM messages WHERE status = 0")
+    suspend fun getPendingMessages(): List<Message>
 
     @Query("SELECT * FROM messages WHERE messageId = :msgId LIMIT 1")
     suspend fun getMessageById(msgId: String): Message?

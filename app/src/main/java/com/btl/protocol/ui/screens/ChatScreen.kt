@@ -29,6 +29,7 @@ import com.btl.protocol.R
 import com.btl.protocol.data.repository.Message
 import com.btl.protocol.data.repository.STATUS_PENDING
 import com.btl.protocol.data.repository.STATUS_SENT
+import com.btl.protocol.data.repository.STATUS_FAILED
 import com.btl.protocol.data.repository.STATUS_DELIVERED
 import com.btl.protocol.ui.MeshViewModel
 import com.btl.protocol.ui.utils.parseMarkdown
@@ -334,6 +335,7 @@ private fun MessageStatusIcon(status: Int) {
         STATUS_PENDING -> Icon(Icons.Rounded.Schedule, contentDescription = "Pending", tint = iconColor, modifier = Modifier.size(12.dp))
         STATUS_SENT -> Icon(Icons.Rounded.Check, contentDescription = "Sent", tint = iconColor, modifier = Modifier.size(14.dp))
         STATUS_DELIVERED -> Icon(Icons.Rounded.DoneAll, contentDescription = "Delivered", tint = iconColor, modifier = Modifier.size(14.dp))
+        STATUS_FAILED -> Icon(Icons.Rounded.ErrorOutline, contentDescription = "Failed", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(14.dp))
     }
 }
 

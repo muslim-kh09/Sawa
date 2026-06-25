@@ -41,6 +41,7 @@ class MeshRepository @Inject constructor(
     }
 
     suspend fun getAllMessageIds(): List<String> = messageDao.getAllMessageIds()
+    suspend fun getPendingMessages(): List<Message> = messageDao.getPendingMessages()
     
     suspend fun getMessageById(msgId: String): Message? = messageDao.getMessageById(msgId)
 

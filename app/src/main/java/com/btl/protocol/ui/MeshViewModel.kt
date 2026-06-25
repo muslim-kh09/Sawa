@@ -11,6 +11,8 @@ import com.btl.protocol.data.repository.MeshRepository
 import com.btl.protocol.data.repository.Message
 import com.btl.protocol.data.repository.STATUS_PENDING
 import com.btl.protocol.data.repository.STATUS_SENT
+import com.btl.protocol.data.repository.STATUS_FAILED
+import kotlinx.coroutines.Dispatchers
 import com.btl.protocol.data.repository.STATUS_DELIVERED
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -87,7 +89,7 @@ class MeshViewModel @Inject constructor(
             }
 
             BtlMeshService.enqueueTransmit(payload, rowId) { success ->
-                viewModelScope.launch {
+                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                     if (success) {
                         repository.updateStatus(rowId, STATUS_SENT)
                         Log.d(TAG, "Message $rowId sent to mesh ✓")

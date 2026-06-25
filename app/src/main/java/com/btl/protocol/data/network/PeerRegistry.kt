@@ -28,10 +28,12 @@ private const val EVICTION_PERIOD_MS = 15_000L
  */
 data class SawaPeer(
     val nodeId: String,
-    val address: String,
-    @Volatile var device: BluetoothDevice,
+    val address: String?,
+    @Volatile var device: BluetoothDevice?,
     @Volatile var lastSeen: Long = System.currentTimeMillis(),
-    @Volatile var rssi: Int = 0
+    @Volatile var rssi: Int = 0,
+    @Volatile var isMesh: Boolean = false,
+    @Volatile var meshName: String? = null
 )
 
 /**
@@ -86,9 +88,28 @@ class PeerRegistry(scope: CoroutineScope) {
 
     /** Returns a snapshot of all currently tracked peers. */
     fun all(): List<SawaPeer> = _peers.values.toList()
+    fun allDirect(): List<SawaPeer> = _peers.values.filter { !it.isMesh }
 
-    /** Returns the current number of tracked peers. */
     fun count(): Int = _peers.size
+    
+    fun seenMesh(nodeId: String, name: String) {
+        val existing = _peers[nodeId]
+        if (existing != null) {
+            existing.lastSeen = System.currentTimeMillis()
+            if (existing.isMesh) {
+                existing.meshName = name
+            }
+        } else {
+            _peers[nodeId] = SawaPeer(
+                nodeId = nodeId,
+                address = null,
+                device = null,
+                isMesh = true,
+                meshName = name
+            )
+            publish()
+        }
+    }
 
     // ──────────────────────────────────────────────────────────────────────────
     // Eviction

@@ -244,9 +244,11 @@ class GattOperationQueue(
                     fragIndex++
                     
                     if (writeType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) {
-                        scope.launch {
-                            delay(5) // Lightweight pacing to reduce floods and allow BLE buffers to drain
+                        try {
                             writeNext(gatt, characteristic)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Fatal crash in callback-driven writeNext", e)
+                            settle(false)
                         }
                     } else {
                         scope.launch {
