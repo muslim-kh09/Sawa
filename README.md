@@ -16,7 +16,7 @@ Sawa is an offline Bluetooth messenger. It lets you send messages without intern
   - Persistent background mesh stability via OS-native low-power scanning.
   - Robust fragmentation pipeline for stable large payloads and offline media.
 
-> **Version:** 2.0.4
+> **Version:** 2.0.5
 > **Note:** This app was coded by AI. It is incomplete and meant for testing purposes only.
 
 ### How to use

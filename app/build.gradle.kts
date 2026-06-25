@@ -14,8 +14,8 @@ android {
         applicationId = "com.btl.protocol"
         minSdk = 21
         targetSdk = 35
-        versionCode = 19
-        versionName = "2.0.4"
+        versionCode = 20
+        versionName = "2.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
