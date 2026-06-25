@@ -696,6 +696,9 @@ class BtlMeshService : Service() {
         } else {
             Log.w(TAG, "Malformed TYPE_CHAT packet dropped silently.")
         }
+        } catch (e: Exception) {
+            Log.e(TAG, "Fatal crash inside handleIncomingPayload!", e)
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
