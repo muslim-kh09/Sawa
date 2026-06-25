@@ -76,6 +76,10 @@ class BtlMeshService : Service() {
         /** Default broadcast TTL — packets relay up to 7 hops. */
         private const val BROADCAST_TTL: Byte = 7
 
+        const val TYPE_CHAT: Byte = 0x01
+        const val TYPE_SYNC: Byte = 0x02
+        const val TYPE_DISCOVERY: Byte = 0x03
+
         var LOCAL_DEVICE_ID = ""
         var NODE_ID_BYTES = ByteArray(8)
         var NODE_ID_STRING = ""
@@ -221,7 +225,7 @@ class BtlMeshService : Service() {
                 onResult(false)
                 return
             }
-            var successCount = 0
+            val reported = java.util.concurrent.atomic.AtomicBoolean(false)
             var completedCount = 0
             peers.forEach { peer ->
                 queue.enqueue(
@@ -230,9 +234,13 @@ class BtlMeshService : Service() {
                         payload = payload,
                         messageId = messageId.toInt()
                     ) { success ->
-                        if (success) successCount++
+                        if (success && reported.compareAndSet(false, true)) {
+                            onResult(true)
+                        }
                         if (++completedCount == peers.size) {
-                            onResult(successCount > 0)
+                            if (reported.compareAndSet(false, true)) {
+                                onResult(false)
+                            }
                         }
                     }
                 )
@@ -345,7 +353,6 @@ class BtlMeshService : Service() {
             startAdvertising()
             _meshActive.value = true
             isRadioOn = true
-            startDutyCycleLoop()
             Log.i(TAG, "Mesh started.")
         } else {
             Log.w(TAG, "Bluetooth not enabled — mesh not started.")
@@ -657,7 +664,7 @@ class BtlMeshService : Service() {
             return
         }
         val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
             .build()
         // Hardware UUID filter — only Sawa devices reach the callback
         val filter = ScanFilter.Builder()
@@ -749,50 +756,10 @@ class BtlMeshService : Service() {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Adaptive Duty Cycling (Battery Saver)
+    // Adaptive Duty Cycling Removed (Using OS-Native SCAN_MODE_LOW_POWER)
     // ──────────────────────────────────────────────────────────────────────────
 
-    private var isDutyCycling = false
     private var isRadioOn = false
-
-    private fun startDutyCycleLoop() {
-        serviceScope.launch {
-            while (true) {
-                kotlinx.coroutines.delay(5000)
-                val hasRecentTraffic = (System.currentTimeMillis() - lastTrafficTime) < 60_000L
-                val connectedCount = peerRegistry.count()
-                val shouldDutyCycle = !hasRecentTraffic && connectedCount > 2
-
-                if (shouldDutyCycle && !isDutyCycling) {
-                    isDutyCycling = true
-                    Log.i(TAG, "Entering adaptive duty cycle mode (Battery Saver)")
-                } else if (!shouldDutyCycle && isDutyCycling) {
-                    isDutyCycling = false
-                    Log.i(TAG, "Exiting duty cycle mode (Continuous)")
-                    if (!isRadioOn) {
-                        startScanning()
-                        startAdvertising()
-                        isRadioOn = true
-                    }
-                }
-
-                if (isDutyCycling) {
-                    if (!isRadioOn) {
-                        startScanning()
-                        startAdvertising()
-                        isRadioOn = true
-                    }
-                    kotlinx.coroutines.delay(5000) // ON duration
-                    if (isDutyCycling) {
-                        stopScanning()
-                        stopAdvertising()
-                        isRadioOn = false
-                        kotlinx.coroutines.delay(15000) // OFF duration
-                    }
-                }
-            }
-        }
-    }
 
     // ──────────────────────────────────────────────────────────────────────────
     // Packet Encoding
@@ -803,28 +770,29 @@ class BtlMeshService : Service() {
      *
      * Format: (senderHex: 64 bytes) (seq: 4 bytes BE) (ttl: 1 byte) (utf8Text...)
      */
-    fun buildOutgoingPayload(text: String): ByteArray {
+    fun buildOutgoingPayload(text: String, type: Byte = if (text.startsWith("SYNC|")) TYPE_SYNC else TYPE_CHAT): ByteArray {
         val seq = seqNum.getAndIncrement()
         val senderHex = identityManager.getPublicFingerprint()
-        return buildPayload(senderHex, seq, BROADCAST_TTL, text.toByteArray(Charsets.UTF_8))
+        return buildPayload(senderHex, seq, BROADCAST_TTL, type, text.toByteArray(Charsets.UTF_8))
     }
 
-    fun buildOutgoingPayload(data: ByteArray): ByteArray {
+    fun buildOutgoingPayload(data: ByteArray, type: Byte = TYPE_CHAT): ByteArray {
         val seq = seqNum.getAndIncrement()
         val senderHex = identityManager.getPublicFingerprint()
-        return buildPayload(senderHex, seq, BROADCAST_TTL, data)
+        return buildPayload(senderHex, seq, BROADCAST_TTL, type, data)
     }
 
-    private fun buildPayload(senderHex: String, seq: Int, ttl: Byte, textBytes: ByteArray): ByteArray {
+    private fun buildPayload(senderHex: String, seq: Int, ttl: Byte, type: Byte, textBytes: ByteArray): ByteArray {
         val senderBytes = senderHex.toByteArray(Charsets.US_ASCII)  // 64 bytes
-        return ByteArray(senderBytes.size + 4 + 1 + textBytes.size).also { buf ->
+        return ByteArray(senderBytes.size + 4 + 1 + 1 + textBytes.size).also { buf ->
             senderBytes.copyInto(buf, 0)
             buf[64] = ((seq shr 24) and 0xFF).toByte()
             buf[65] = ((seq shr 16) and 0xFF).toByte()
             buf[66] = ((seq shr 8) and 0xFF).toByte()
             buf[67] = (seq and 0xFF).toByte()
             buf[68] = ttl
-            textBytes.copyInto(buf, 69)
+            buf[69] = type
+            textBytes.copyInto(buf, 70)
         }
     }
 

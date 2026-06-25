@@ -9,25 +9,15 @@ import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 
 private const val TAG = "GattOpQueue"
 private const val TARGET_MTU = 512
-private const val GATT_TIMEOUT_MS = 300_000L
+private const val GATT_TIMEOUT_MS = 15_000L
 private const val MAX_RETRIES = 1
 private const val RETRY_BASE_DELAY_MS = 500L
 private const val INTER_OP_COOLDOWN_MS = 20L
 
-/**
- * Represents a single write request to a remote BLE peer.
- *
- * @param device       The target BluetoothDevice.
- * @param payload      The raw byte payload to deliver (will be fragmented if needed).
- * @param messageId    The Room DB message ID for status tracking (-1 if not applicable).
- * @param onComplete   Called when all fragments are delivered (true) or all retries exhausted (false).
- */
 data class GattWriteOp(
     val device: BluetoothDevice,
     val payload: ByteArray,
@@ -35,25 +25,18 @@ data class GattWriteOp(
     val onComplete: (success: Boolean) -> Unit = {}
 )
 
-/**
- * Serialized GATT operation queue that processes one [GattWriteOp] at a time.
- *
- * For each operation:
- * 1. Connects to the remote device via LE transport
- * 2. Negotiates MTU (target: 512 bytes)
- * 3. Discovers services to locate the Sawa characteristic
- * 4. Sends all payload fragments sequentially, waiting for acknowledgment per fragment
- * 5. Disconnects cleanly on completion or failure
- *
- * On failure, retries up to [MAX_RETRIES] times with exponential backoff.
- */
+enum class ConnectionState {
+    DISCONNECTED, CONNECTING, READY
+}
+
 class GattOperationQueue(
     private val context: Context,
     private val scope: CoroutineScope
 ) {
     private val deviceChannels = ConcurrentHashMap<String, Channel<GattWriteOp>>()
+    private val deviceStates = ConcurrentHashMap<String, ConnectionState>()
+    private val activeGatts = ConcurrentHashMap<String, BluetoothGatt>()
 
-    /** Enqueues a write operation. Thread-safe. */
     fun enqueue(op: GattWriteOp) {
         val mac = op.device.address
         val channel = deviceChannels.getOrPut(mac) {
@@ -69,15 +52,15 @@ class GattOperationQueue(
         channel.trySend(op)
     }
 
-    /** Shuts down the queue — no more operations will be processed. */
     fun close() {
         deviceChannels.values.forEach { it.close() }
         deviceChannels.clear()
+        activeGatts.values.forEach { 
+            try { it.disconnect(); it.close() } catch (_: SecurityException) {} 
+        }
+        activeGatts.clear()
+        deviceStates.clear()
     }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Internal
-    // ──────────────────────────────────────────────────────────────────────────
 
     private suspend fun processWithRetry(op: GattWriteOp) {
         repeat(MAX_RETRIES) { attempt ->
@@ -88,29 +71,33 @@ class GattOperationQueue(
             }
             val backoff = RETRY_BASE_DELAY_MS * (attempt + 1)
             Log.w(TAG, "Attempt ${attempt + 1}/$MAX_RETRIES failed for ${op.device.address}. Retry in ${backoff}ms")
+            
+            // On failure, tear down connection to reset state
+            tearDown(op.device.address)
+            
             if (attempt < MAX_RETRIES - 1) delay(backoff)
         }
         Log.e(TAG, "All retries exhausted for ${op.device.address}")
         op.onComplete(false)
+        tearDown(op.device.address)
+    }
+
+    private fun tearDown(mac: String) {
+        deviceStates[mac] = ConnectionState.DISCONNECTED
+        activeGatts.remove(mac)?.let {
+            try { it.disconnect(); it.close() } catch (_: SecurityException) {}
+        }
     }
 
     private suspend fun executeOnce(op: GattWriteOp): Boolean =
         suspendCancellableCoroutine { cont ->
-            var gattRef: BluetoothGatt? = null
-            var negotiatedMtu = 23
+            val mac = op.device.address
             var fragments: List<ByteArray> = emptyList()
             var fragIndex = 0
             val settled = AtomicBoolean(false)
 
             fun settle(success: Boolean) {
                 if (settled.compareAndSet(false, true)) {
-                    scope.launch {
-                        delay(200) // Cooperative delay allows BLE callbacks to fire before disconnect
-                        try { 
-                            gattRef?.disconnect()
-                            gattRef?.close() // INSTANT CLOSURE to prevent GATT leaks
-                        } catch (_: SecurityException) {}
-                    }
                     if (cont.isActive) cont.resume(success)
                 }
             }
@@ -129,11 +116,7 @@ class GattOperationQueue(
                     }
 
                     val initiated = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        gatt.writeCharacteristic(
-                            char,
-                            data,
-                            writeType
-                        ) == android.bluetooth.BluetoothStatusCodes.SUCCESS
+                        gatt.writeCharacteristic(char, data, writeType) == android.bluetooth.BluetoothStatusCodes.SUCCESS
                     } else {
                         @Suppress("DEPRECATION")
                         char.value = data
@@ -152,31 +135,54 @@ class GattOperationQueue(
                 }
             }
 
+            // We reuse the existing GATT connection if READY.
+            // If CONNECTING, wait (for simplicity here, we assume one op at a time per device, so CONNECTING means we're in it).
+            val existingState = deviceStates[mac] ?: ConnectionState.DISCONNECTED
+            val existingGatt = activeGatts[mac]
+
+            if (existingState == ConnectionState.READY && existingGatt != null) {
+                // Already connected and ready, just find characteristic and write
+                val char = existingGatt.getService(BtlMeshService.MESH_SERVICE_UUID)
+                    ?.getCharacteristic(BtlMeshService.CHAR_UUID)
+                if (char != null) {
+                    // Start writing directly
+                    fragments = PacketFragmenter.fragment(op.payload, 500) // Fallback safe MTU for pooled
+                    fragIndex = 0
+                    writeNext(existingGatt, char)
+                } else {
+                    settle(false)
+                }
+                return@suspendCancellableCoroutine
+            }
+
+            // Otherwise, we need to connect
+            deviceStates[mac] = ConnectionState.CONNECTING
+
             val callback = object : BluetoothGattCallback() {
                 override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
                     when (newState) {
                         BluetoothProfile.STATE_CONNECTED -> {
-                            Log.d(TAG, "[${op.device.address}] Connected — requesting MTU $TARGET_MTU")
+                            Log.d(TAG, "[$mac] Connected — requesting MTU $TARGET_MTU")
                             scope.launch {
-                                delay(100) // Stabilize connection before MTU negotiation
+                                delay(100)
                                 try {
                                     if (!gatt.requestMtu(TARGET_MTU)) {
                                         Log.w(TAG, "requestMtu failed, falling back to MTU 23")
-                                        negotiatedMtu = 23
                                         fragments = PacketFragmenter.fragment(op.payload, 20)
                                         fragIndex = 0
                                         delay(50)
                                         if (!gatt.discoverServices()) settle(false)
                                     }
                                 } catch (e: SecurityException) {
-                                    Log.e(TAG, "SecurityException requestMtu", e)
                                     settle(false)
                                 }
                             }
                         }
                         BluetoothProfile.STATE_DISCONNECTED -> {
+                            deviceStates[mac] = ConnectionState.DISCONNECTED
+                            activeGatts.remove(mac)
                             if (!settled.get()) {
-                                Log.w(TAG, "[${op.device.address}] Disconnected unexpectedly, status=$status")
+                                Log.w(TAG, "[$mac] Disconnected unexpectedly, status=$status")
                                 settle(false)
                             }
                             try { gatt.close() } catch (_: SecurityException) {}
@@ -185,21 +191,15 @@ class GattOperationQueue(
                 }
 
                 override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
-                    negotiatedMtu = if (status == BluetoothGatt.GATT_SUCCESS) mtu else 23
-                    Log.d(TAG, "[${op.device.address}] MTU = $negotiatedMtu")
-                    // Fragment the payload now that we know the MTU
-                    val maxPayload = negotiatedMtu - 3  // subtract ATT header overhead
+                    val negotiatedMtu = if (status == BluetoothGatt.GATT_SUCCESS) mtu else 23
+                    val maxPayload = negotiatedMtu - 3
                     fragments = PacketFragmenter.fragment(op.payload, maxPayload)
                     fragIndex = 0
                     scope.launch {
-                        delay(50) // Delay before discoverServices
+                        delay(50)
                         try {
-                            if (!gatt.discoverServices()) {
-                                Log.e(TAG, "discoverServices rejected synchronously")
-                                settle(false)
-                            }
+                            if (!gatt.discoverServices()) settle(false)
                         } catch (e: SecurityException) {
-                            Log.e(TAG, "SecurityException discoverServices", e)
                             settle(false)
                         }
                     }
@@ -207,19 +207,17 @@ class GattOperationQueue(
 
                 override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                     if (status != BluetoothGatt.GATT_SUCCESS) {
-                        Log.e(TAG, "[${op.device.address}] Service discovery failed: $status")
                         settle(false)
                         return
                     }
-                    val char = gatt
-                        .getService(BtlMeshService.MESH_SERVICE_UUID)
+                    val char = gatt.getService(BtlMeshService.MESH_SERVICE_UUID)
                         ?.getCharacteristic(BtlMeshService.CHAR_UUID)
-
                     if (char == null) {
-                        Log.e(TAG, "[${op.device.address}] Sawa characteristic not found — not a Sawa node")
                         settle(false)
                         return
                     }
+                    deviceStates[mac] = ConnectionState.READY
+                    activeGatts[mac] = gatt
                     writeNext(gatt, char)
                 }
 
@@ -230,7 +228,6 @@ class GattOperationQueue(
                     status: Int
                 ) {
                     if (status != BluetoothGatt.GATT_SUCCESS) {
-                        Log.e(TAG, "[${op.device.address}] Fragment $fragIndex write failed: $status")
                         settle(false)
                         return
                     }
@@ -242,10 +239,8 @@ class GattOperationQueue(
                     fragIndex++
                     
                     if (writeType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) {
-                        // Reliable write — the OS already waited for the GATT ACK. No pacing needed.
                         writeNext(gatt, characteristic)
                     } else {
-                        // Unreliable write — maintain 15ms pacing to prevent hardware buffer overflow
                         scope.launch {
                             delay(15)
                             writeNext(gatt, characteristic)
@@ -255,25 +250,23 @@ class GattOperationQueue(
             }
 
             try {
-                gattRef = op.device.connectGatt(
+                val newGatt = op.device.connectGatt(
                     context,
                     false,
                     callback,
                     BluetoothDevice.TRANSPORT_LE
                 )
-                if (gattRef == null) {
-                    Log.e(TAG, "[${op.device.address}] connectGatt returned null")
+                if (newGatt == null) {
+                    deviceStates[mac] = ConnectionState.DISCONNECTED
                     if (cont.isActive) cont.resume(false)
-                    return@suspendCancellableCoroutine
                 }
             } catch (e: SecurityException) {
-                Log.e(TAG, "[${op.device.address}] SecurityException on connectGatt", e)
+                deviceStates[mac] = ConnectionState.DISCONNECTED
                 if (cont.isActive) cont.resume(false)
-                return@suspendCancellableCoroutine
             }
 
             cont.invokeOnCancellation {
-                try { gattRef?.disconnect(); gattRef?.close() } catch (_: SecurityException) {}
+                if (!settled.get()) settle(false)
             }
         }
 }
