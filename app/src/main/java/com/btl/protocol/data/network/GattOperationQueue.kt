@@ -33,9 +33,12 @@ class GattOperationQueue(
     private val context: Context,
     private val scope: CoroutineScope
 ) {
+    var onQueueActiveChanged: (Boolean) -> Unit = {}
+    private val activeOpCount = java.util.concurrent.atomic.AtomicInteger(0)
     private val deviceChannels = ConcurrentHashMap<String, Channel<GattWriteOp>>()
     private val deviceStates = ConcurrentHashMap<String, ConnectionState>()
     private val activeGatts = ConcurrentHashMap<String, BluetoothGatt>()
+    private val deviceMtus = ConcurrentHashMap<String, Int>()
 
     fun enqueue(op: GattWriteOp) {
         val mac = op.device.address
@@ -63,23 +66,31 @@ class GattOperationQueue(
     }
 
     private suspend fun processWithRetry(op: GattWriteOp) {
-        repeat(MAX_RETRIES) { attempt ->
-            val success = withTimeoutOrNull(GATT_TIMEOUT_MS) { executeOnce(op) } ?: false
-            if (success) {
-                op.onComplete(true)
-                return
-            }
-            val backoff = RETRY_BASE_DELAY_MS * (attempt + 1)
-            Log.w(TAG, "Attempt ${attempt + 1}/$MAX_RETRIES failed for ${op.device.address}. Retry in ${backoff}ms")
-            
-            // On failure, tear down connection to reset state
-            tearDown(op.device.address)
-            
-            if (attempt < MAX_RETRIES - 1) delay(backoff)
+        if (activeOpCount.getAndIncrement() == 0) {
+            onQueueActiveChanged(true)
         }
-        Log.e(TAG, "All retries exhausted for ${op.device.address}")
-        op.onComplete(false)
-        tearDown(op.device.address)
+        try {
+            repeat(MAX_RETRIES) { attempt ->
+                val dynamicTimeout = GATT_TIMEOUT_MS + (op.payload.size * 10L)
+                val success = withTimeoutOrNull(dynamicTimeout) { executeOnce(op) } ?: false
+                if (success) {
+                    op.onComplete(true)
+                    return
+                }
+                val backoff = RETRY_BASE_DELAY_MS * (attempt + 1)
+                Log.w(TAG, "Attempt ${attempt + 1}/$MAX_RETRIES failed for ${op.device.address}. Retry in ${backoff}ms")
+                
+                tearDown(op.device.address)
+                if (attempt < MAX_RETRIES - 1) delay(backoff)
+            }
+            Log.e(TAG, "All retries exhausted for ${op.device.address}")
+            op.onComplete(false)
+            tearDown(op.device.address)
+        } finally {
+            if (activeOpCount.decrementAndGet() == 0) {
+                onQueueActiveChanged(false)
+            }
+        }
     }
 
     private fun tearDown(mac: String) {
@@ -142,7 +153,8 @@ class GattOperationQueue(
                     ?.getCharacteristic(BtlMeshService.CHAR_UUID)
                 if (char != null) {
                     // Start writing directly
-                    fragments = PacketFragmenter.fragment(op.payload, 500) // Fallback safe MTU for pooled
+                    val mtu = deviceMtus[mac] ?: 23
+                    fragments = PacketFragmenter.fragment(op.payload, mtu - 3)
                     fragIndex = 0
                     writeNext(existingGatt, char)
                 } else {
@@ -188,6 +200,7 @@ class GattOperationQueue(
 
                 override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
                     val negotiatedMtu = if (status == BluetoothGatt.GATT_SUCCESS) mtu else 23
+                    deviceMtus[gatt.device.address] = negotiatedMtu
                     val maxPayload = negotiatedMtu - 3
                     fragments = PacketFragmenter.fragment(op.payload, maxPayload)
                     fragIndex = 0
@@ -231,7 +244,10 @@ class GattOperationQueue(
                     fragIndex++
                     
                     if (writeType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) {
-                        writeNext(gatt, characteristic)
+                        scope.launch {
+                            delay(5) // Lightweight pacing to reduce floods and allow BLE buffers to drain
+                            writeNext(gatt, characteristic)
+                        }
                     } else {
                         scope.launch {
                             delay(15)

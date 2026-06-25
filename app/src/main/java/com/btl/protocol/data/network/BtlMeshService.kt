@@ -226,7 +226,7 @@ class BtlMeshService : Service() {
                 return
             }
             val reported = java.util.concurrent.atomic.AtomicBoolean(false)
-            var completedCount = 0
+            val completedCount = java.util.concurrent.atomic.AtomicInteger(0)
             peers.forEach { peer ->
                 queue.enqueue(
                     GattWriteOp(
@@ -237,7 +237,7 @@ class BtlMeshService : Service() {
                         if (success && reported.compareAndSet(false, true)) {
                             onResult(true)
                         }
-                        if (++completedCount == peers.size) {
+                        if (completedCount.incrementAndGet() == peers.size) {
                             if (reported.compareAndSet(false, true)) {
                                 onResult(false)
                             }
@@ -302,7 +302,15 @@ class BtlMeshService : Service() {
         bluetoothAdapter = bluetoothManager.adapter
 
         peerRegistry = PeerRegistry(serviceScope)
-        gattQueue = GattOperationQueue(this, serviceScope)
+        gattQueue = GattOperationQueue(this, serviceScope).apply {
+            onQueueActiveChanged = { isActive ->
+                if (isActive) {
+                    stopScanning()
+                } else {
+                    if (_meshActive.value) startScanning()
+                }
+            }
+        }
 
         liveQueue = gattQueue
         livePeers = peerRegistry
