@@ -1,3 +1,9 @@
+## v2.0.4
+- **BitChat Pacing & Stability:** Incorporated the official BitChat iOS logic to pause background BLE scanning during large transfers to eliminate radio time-multiplexing drops, and introduced lightweight buffer draining delays.
+- **Dynamic BLE Timeouts:** Replaced the global rigid GATT timeout with a dynamic duration scaled based on payload chunk size, guaranteeing large offline files won't prematurely terminate.
+- **Safe MTU Discovery:** Enforced safe MTU transmission tracking, preventing large packets from being silently dropped by strictly matching the receiver's negotiated capabilities.
+- **UI "Sent" Status Fix:** Resolved a race condition in the asynchronous peer queue that prevented the single checkmark `STATUS_SENT` from reliably appearing when sending to multiple peers.
+
 ## v2.0.3
 - **Architectural Reform:** Executed a massive network layer overhaul by successfully smashing the fatal 5-minute GATT timeout and slashing it down to 15 seconds.
 - **Background Architecture:** Permanently deleted the naive 15s radio-shutdown battery saver loop, successfully moving to OS-native `SCAN_MODE_LOW_POWER`.
