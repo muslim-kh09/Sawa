@@ -106,7 +106,7 @@ class BtlMeshService : Service() {
         fun panicWipe() {
             packetCache.clear()
             peers.value.values.forEach { 
-                try { it.device.connectGatt(null, false, null, BluetoothDevice.TRANSPORT_LE)?.close() } catch(_: Exception){} 
+                try { it.device?.connectGatt(null, false, null, BluetoothDevice.TRANSPORT_LE)?.close() } catch(_: Exception){} 
             }
             // Clear current message queue if possible (not strictly required if app restarts, but good hygiene)
         }
