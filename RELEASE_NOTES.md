@@ -2,6 +2,9 @@
 - **Architectural Reform:** Executed a massive network layer overhaul by successfully smashing the fatal 5-minute GATT timeout and slashing it down to 15 seconds.
 - **Background Architecture:** Permanently deleted the naive 15s radio-shutdown battery saver loop, successfully moving to OS-native `SCAN_MODE_LOW_POWER`.
 - **Strict Binary Routing:** Eradicated the plaintext legacy UI packet leak by introducing strict byte-header typing (`0x01` Chat, `0x02` Sync), ensuring encrypted identity payloads no longer bleed into the public chat UI.
+- **Fragmentation Reboot (Phase 2):** Unified the chunking logic into a robust BitChat-inspired resilient BLE Mesh protocol, dropping redundant implementations.
+- **Strict Chunking Write:** Enforced `WRITE_TYPE_DEFAULT` (Write with Response) for all outgoing fragmentation payloads, eliminating arbitrary thread delays.
+- **Memory Safety:** Implemented strict 30s timeout tracking on the inbound payload assembly buffer to automatically self-clear dropped connections and prevent memory leaks.
 
 ## v2.0.2
 - **Arabic Language Default:** The app now strictly enforces Arabic language and right-to-left (RTL) layout by default for all users, unless their device is explicitly set to English.

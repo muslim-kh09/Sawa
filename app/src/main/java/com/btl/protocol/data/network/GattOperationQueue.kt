@@ -109,11 +109,7 @@ class GattOperationQueue(
                 }
                 val data = fragments[fragIndex]
                 try {
-                    val writeType = if ((char.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
-                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    } else {
-                        BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-                    }
+                    val writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
 
                     val initiated = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         gatt.writeCharacteristic(char, data, writeType) == android.bluetooth.BluetoothStatusCodes.SUCCESS
@@ -231,11 +227,7 @@ class GattOperationQueue(
                         settle(false)
                         return
                     }
-                    val writeType = if ((characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0) {
-                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    } else {
-                        BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-                    }
+                    val writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
                     fragIndex++
                     
                     if (writeType == BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) {
